@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useCampaignContext } from '@/contexts/CampaignContext';
@@ -23,29 +23,36 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MapGrid } from '@/components/maps/MapGrid';
 import { MapScene3D } from '@/components/maps/MapScene3D';
 import { TokenPanel } from '@/components/maps/TokenPanel';
 import { MapToolbar } from '@/components/maps/MapToolbar';
 import { AssetLibrary } from '@/components/maps/AssetLibrary';
+import { DrawableMapGrid, DrawableMapGridRef } from '@/components/maps/DrawableMapGrid';
+import { DrawingToolbar } from '@/components/maps/DrawingToolbar';
+import { LayerPanel } from '@/components/maps/LayerPanel';
+import { MapExport } from '@/components/maps/MapExport';
 import { MapData, MapToken } from '@/components/maps/types';
 import { MapAsset } from '@/components/maps/assetTypes';
-import { Plus, Map, AlertCircle, Trash2, Grid3X3, Box, Sun, Moon, Flame, Package } from 'lucide-react';
+import { MapDrawing, MapLayer, DrawingState, DrawingTool, DEFAULT_LAYERS } from '@/components/maps/drawingTypes';
+import { Plus, Map, AlertCircle, Trash2, Grid3X3, Box, Sun, Moon, Flame, Package, Paintbrush, Layers } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 type ViewMode = '2d' | '3d';
 type Environment3D = 'day' | 'night' | 'dungeon';
-type PanelMode = 'tokens' | 'assets';
+type PanelMode = 'tokens' | 'assets' | 'layers';
 
 export default function MapBuilder() {
   const { activeCampaign } = useCampaignContext();
   const { user } = useAuth();
   const { toast } = useToast();
+  const mapGridRef = useRef<DrawableMapGridRef>(null);
 
   const [maps, setMaps] = useState<MapData[]>([]);
   const [activeMap, setActiveMap] = useState<MapData | null>(null);
   const [tokens, setTokens] = useState<MapToken[]>([]);
   const [assets, setAssets] = useState<MapAsset[]>([]);
+  const [drawings, setDrawings] = useState<MapDrawing[]>([]);
+  const [layers, setLayers] = useState<MapLayer[]>([]);
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,6 +62,22 @@ export default function MapBuilder() {
   const [viewMode, setViewMode] = useState<ViewMode>('2d');
   const [environment3D, setEnvironment3D] = useState<Environment3D>('dungeon');
   const [panelMode, setPanelMode] = useState<PanelMode>('tokens');
+  const [showDrawingToolbar, setShowDrawingToolbar] = useState(false);
+
+  // Drawing state
+  const [drawingState, setDrawingState] = useState<DrawingState>({
+    isDrawing: false,
+    currentTool: 'select',
+    brushColor: '#ffffff',
+    brushSize: 10,
+    brushOpacity: 1,
+    currentPoints: [],
+    activeLayerId: null,
+  });
+
+  // Undo/Redo history
+  const [drawingHistory, setDrawingHistory] = useState<MapDrawing[][]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
 
   // Load maps
   useEffect(() => {
@@ -86,16 +109,18 @@ export default function MapBuilder() {
     loadMaps();
   }, [activeCampaign, toast]);
 
-  // Load tokens and assets when map changes
+  // Load tokens, assets, drawings, and layers when map changes
   useEffect(() => {
     if (!activeMap) {
       setTokens([]);
       setAssets([]);
+      setDrawings([]);
+      setLayers([]);
       return;
     }
 
     const loadMapData = async () => {
-      const [tokensResult, assetsResult] = await Promise.all([
+      const [tokensResult, assetsResult, drawingsResult, layersResult] = await Promise.all([
         supabase
           .from('map_tokens')
           .select('*')
@@ -106,31 +131,51 @@ export default function MapBuilder() {
           .select('*')
           .eq('map_id', activeMap.id)
           .order('layer', { ascending: true }),
+        supabase
+          .from('map_drawings')
+          .select('*')
+          .eq('map_id', activeMap.id)
+          .order('layer', { ascending: true }),
+        supabase
+          .from('map_layers')
+          .select('*')
+          .eq('map_id', activeMap.id)
+          .order('layer_order', { ascending: true }),
       ]);
 
       if (tokensResult.error) {
-        toast({
-          variant: 'destructive',
-          title: 'Erro ao carregar tokens',
-          description: tokensResult.error.message,
-        });
+        console.error('Error loading tokens:', tokensResult.error);
       } else {
         setTokens(tokensResult.data as MapToken[]);
       }
 
       if (assetsResult.error) {
-        toast({
-          variant: 'destructive',
-          title: 'Erro ao carregar assets',
-          description: assetsResult.error.message,
-        });
+        console.error('Error loading assets:', assetsResult.error);
       } else {
         setAssets(assetsResult.data as MapAsset[]);
+      }
+
+      if (drawingsResult.error) {
+        console.error('Error loading drawings:', drawingsResult.error);
+      } else {
+        const loadedDrawings = (drawingsResult.data || []).map((d: any) => ({
+          ...d,
+          points: Array.isArray(d.points) ? d.points : JSON.parse(d.points || '[]'),
+        }));
+        setDrawings(loadedDrawings);
+        setDrawingHistory([loadedDrawings]);
+        setHistoryIndex(0);
+      }
+
+      if (layersResult.error) {
+        console.error('Error loading layers:', layersResult.error);
+      } else {
+        setLayers(layersResult.data as MapLayer[]);
       }
     };
 
     loadMapData();
-  }, [activeMap, toast]);
+  }, [activeMap]);
 
   const handleCreateMap = async () => {
     if (!newMapName.trim() || !activeCampaign || !user) return;
@@ -159,6 +204,18 @@ export default function MapBuilder() {
     }
 
     const newMap = data as MapData;
+    
+    // Create default layers for the new map
+    const defaultLayers = DEFAULT_LAYERS.map((l) => ({
+      map_id: newMap.id,
+      user_id: user.id,
+      name: l.name,
+      layer_type: l.layer_type,
+      layer_order: l.layer_order,
+    }));
+
+    await supabase.from('map_layers').insert(defaultLayers);
+
     setMaps([newMap, ...maps]);
     setActiveMap(newMap);
     setNewMapName('');
@@ -386,6 +443,158 @@ export default function MapBuilder() {
     setAssets(assets.filter((a) => a.id !== assetId));
   };
 
+  // Drawing handlers
+  const handleDrawingComplete = async (
+    drawingData: Omit<MapDrawing, 'id' | 'map_id' | 'user_id' | 'created_at' | 'updated_at'>
+  ) => {
+    if (!activeMap || !user) return;
+
+    const { data, error } = await supabase
+      .from('map_drawings')
+      .insert({
+        map_id: activeMap.id,
+        user_id: user.id,
+        ...drawingData,
+        points: JSON.stringify(drawingData.points),
+      })
+      .select()
+      .single();
+
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao salvar desenho',
+        description: error.message,
+      });
+      return;
+    }
+
+    const newDrawing = {
+      ...data,
+      points: drawingData.points,
+    } as MapDrawing;
+
+    const newDrawings = [...drawings, newDrawing];
+    setDrawings(newDrawings);
+
+    // Update history
+    const newHistory = drawingHistory.slice(0, historyIndex + 1);
+    newHistory.push(newDrawings);
+    setDrawingHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  };
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      setHistoryIndex(historyIndex - 1);
+      setDrawings(drawingHistory[historyIndex - 1]);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < drawingHistory.length - 1) {
+      setHistoryIndex(historyIndex + 1);
+      setDrawings(drawingHistory[historyIndex + 1]);
+    }
+  };
+
+  const handleClearLayer = async () => {
+    if (!activeMap) return;
+
+    const { error } = await supabase
+      .from('map_drawings')
+      .delete()
+      .eq('map_id', activeMap.id);
+
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao limpar desenhos',
+        description: error.message,
+      });
+      return;
+    }
+
+    setDrawings([]);
+    const newHistory = [...drawingHistory, []];
+    setDrawingHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+
+    toast({
+      title: 'Desenhos limpos',
+      description: 'Todos os desenhos foram removidos.',
+    });
+  };
+
+  // Layer handlers
+  const handleLayerCreate = async (name: string, layerType: string) => {
+    if (!activeMap || !user) return;
+
+    const maxOrder = Math.max(...layers.map((l) => l.layer_order || 0), -1);
+
+    const { data, error } = await supabase
+      .from('map_layers')
+      .insert({
+        map_id: activeMap.id,
+        user_id: user.id,
+        name,
+        layer_type: layerType,
+        layer_order: maxOrder + 1,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao criar camada',
+        description: error.message,
+      });
+      return;
+    }
+
+    setLayers([...layers, data as MapLayer]);
+  };
+
+  const handleLayerUpdate = async (layerId: string, updates: Partial<MapLayer>) => {
+    setLayers(layers.map((l) => (l.id === layerId ? { ...l, ...updates } : l)));
+
+    const { error } = await supabase
+      .from('map_layers')
+      .update(updates)
+      .eq('id', layerId);
+
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao atualizar camada',
+        description: error.message,
+      });
+    }
+  };
+
+  const handleLayerDelete = async (layerId: string) => {
+    const { error } = await supabase
+      .from('map_layers')
+      .delete()
+      .eq('id', layerId);
+
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao excluir camada',
+        description: error.message,
+      });
+      return;
+    }
+
+    setLayers(layers.filter((l) => l.id !== layerId));
+  };
+
+  const handleLayerReorder = async (layerId: string, newOrder: number) => {
+    // TODO: Implement layer reordering with drag and drop
+  };
+
   if (!activeCampaign) {
     return (
       <AppLayout title="Construtor de Mapas">
@@ -449,15 +658,40 @@ export default function MapBuilder() {
         </div>
       ) : activeMap ? (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <MapToolbar
-              map={activeMap}
-              isSaving={isSaving}
-              onSave={handleSaveMap}
-              onMapUpdate={handleMapUpdate}
-            />
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <MapToolbar
+                map={activeMap}
+                isSaving={isSaving}
+                onSave={handleSaveMap}
+                onMapUpdate={handleMapUpdate}
+              />
+              {activeMap && (
+                <MapExport
+                  map={activeMap}
+                  tokens={tokens}
+                  assets={assets}
+                  drawings={drawings}
+                  layers={layers}
+                  canvasRef={{ current: mapGridRef.current?.getCanvas() || null }}
+                />
+              )}
+            </div>
             
             <div className="flex items-center gap-4">
+              {/* Drawing toggle */}
+              {viewMode === '2d' && (
+                <Button
+                  variant={showDrawingToolbar ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setShowDrawingToolbar(!showDrawingToolbar)}
+                  className="gap-2"
+                >
+                  <Paintbrush className="w-4 h-4" />
+                  Desenhar
+                </Button>
+              )}
+
               {/* Environment selector for 3D */}
               {viewMode === '3d' && (
                 <div className="flex items-center gap-2">
@@ -498,6 +732,10 @@ export default function MapBuilder() {
                     <Package className="w-3 h-3" />
                     Assets
                   </TabsTrigger>
+                  <TabsTrigger value="layers" className="gap-2 text-xs">
+                    <Layers className="w-3 h-3" />
+                    Camadas
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
               
@@ -517,18 +755,37 @@ export default function MapBuilder() {
             </div>
           </div>
 
+          {/* Drawing toolbar */}
+          {showDrawingToolbar && viewMode === '2d' && (
+            <DrawingToolbar
+              drawingState={drawingState}
+              onToolChange={(tool) => setDrawingState({ ...drawingState, currentTool: tool })}
+              onColorChange={(color) => setDrawingState({ ...drawingState, brushColor: color })}
+              onBrushSizeChange={(size) => setDrawingState({ ...drawingState, brushSize: size })}
+              onOpacityChange={(opacity) => setDrawingState({ ...drawingState, brushOpacity: opacity })}
+              onUndo={handleUndo}
+              onRedo={handleRedo}
+              onClearLayer={handleClearLayer}
+              canUndo={historyIndex > 0}
+              canRedo={historyIndex < drawingHistory.length - 1}
+            />
+          )}
+
           <div className="flex gap-0">
-            <div className="flex-1" style={{ height: 'calc(100vh - 20rem)' }}>
+            <div className="flex-1" style={{ height: 'calc(100vh - 22rem)' }}>
               {viewMode === '2d' ? (
-                <MapGrid
+                <DrawableMapGrid
+                  ref={mapGridRef}
                   gridWidth={activeMap.grid_width}
                   gridHeight={activeMap.grid_height}
                   cellSize={activeMap.cell_size}
                   backgroundColor={activeMap.background_color || '#1a1a2e'}
                   tokens={tokens}
                   assets={assets}
+                  drawings={drawings}
                   selectedTokenId={selectedTokenId}
                   selectedAssetId={selectedAssetId}
+                  drawingState={drawingState}
                   onTokenMove={handleTokenMove}
                   onTokenSelect={(id) => {
                     setSelectedTokenId(id);
@@ -541,12 +798,13 @@ export default function MapBuilder() {
                   onAssetMove={handleAssetMove}
                   onCellClick={(x, y) => console.log('Cell clicked:', x, y)}
                   onAssetDrop={handleAssetPlace}
+                  onDrawingComplete={handleDrawingComplete}
                 />
               ) : (
                 <MapScene3D
                   gridWidth={activeMap.grid_width}
                   gridHeight={activeMap.grid_height}
-                  cellSize={activeMap.cell_size / 10} // Scale down for 3D
+                  cellSize={activeMap.cell_size / 10}
                   backgroundColor={activeMap.background_color || '#1a1a2e'}
                   tokens={tokens}
                   selectedTokenId={selectedTokenId}
@@ -556,7 +814,7 @@ export default function MapBuilder() {
               )}
             </div>
 
-            {panelMode === 'tokens' ? (
+            {panelMode === 'tokens' && (
               <TokenPanel
                 tokens={tokens}
                 selectedTokenId={selectedTokenId}
@@ -565,7 +823,9 @@ export default function MapBuilder() {
                 onTokenUpdate={handleTokenUpdate}
                 onTokenDelete={handleTokenDelete}
               />
-            ) : (
+            )}
+
+            {panelMode === 'assets' && (
               <AssetLibrary
                 assets={assets}
                 selectedAssetId={selectedAssetId}
@@ -573,6 +833,18 @@ export default function MapBuilder() {
                 onAssetPlace={(key, cat) => handleAssetPlace(key, cat)}
                 onAssetUpdate={handleAssetUpdate}
                 onAssetDelete={handleAssetDelete}
+              />
+            )}
+
+            {panelMode === 'layers' && (
+              <LayerPanel
+                layers={layers}
+                activeLayerId={drawingState.activeLayerId}
+                onLayerSelect={(id) => setDrawingState({ ...drawingState, activeLayerId: id })}
+                onLayerCreate={handleLayerCreate}
+                onLayerUpdate={handleLayerUpdate}
+                onLayerDelete={handleLayerDelete}
+                onLayerReorder={handleLayerReorder}
               />
             )}
           </div>
