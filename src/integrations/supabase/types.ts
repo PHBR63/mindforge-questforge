@@ -434,13 +434,63 @@ export type Database = {
           },
         ]
       }
+      resource_folders: {
+        Row: {
+          campaign_id: string | null
+          created_at: string
+          id: string
+          is_global: boolean | null
+          name: string
+          parent_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          created_at?: string
+          id?: string
+          is_global?: boolean | null
+          name: string
+          parent_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          campaign_id?: string | null
+          created_at?: string
+          id?: string
+          is_global?: boolean | null
+          name?: string
+          parent_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_folders_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resource_folders_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "resource_folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       resources: {
         Row: {
           campaign_id: string | null
           created_at: string
           description: string | null
           file_url: string | null
+          folder_id: string | null
           id: string
+          is_favorite: boolean | null
           is_global: boolean | null
           name: string
           tags: string[] | null
@@ -454,7 +504,9 @@ export type Database = {
           created_at?: string
           description?: string | null
           file_url?: string | null
+          folder_id?: string | null
           id?: string
+          is_favorite?: boolean | null
           is_global?: boolean | null
           name: string
           tags?: string[] | null
@@ -468,7 +520,9 @@ export type Database = {
           created_at?: string
           description?: string | null
           file_url?: string | null
+          folder_id?: string | null
           id?: string
+          is_favorite?: boolean | null
           is_global?: boolean | null
           name?: string
           tags?: string[] | null
@@ -483,6 +537,13 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resources_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "resource_folders"
             referencedColumns: ["id"]
           },
         ]
