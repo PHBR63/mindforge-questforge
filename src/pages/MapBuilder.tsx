@@ -78,6 +78,7 @@ export default function MapBuilder() {
   const [selectedTileInstanceId, setSelectedTileInstanceId] = useState<string | null>(null);
   const [tilesetPaintMode, setTilesetPaintMode] = useState<'place' | 'paint'>('place');
   const [activePaintTile, setActivePaintTile] = useState<TileDefinition | null>(null);
+  const [copiedTile, setCopiedTile] = useState<PlacedTile | null>(null);
 
   // Drawing state
   const [drawingState, setDrawingState] = useState<DrawingState>({
@@ -961,7 +962,89 @@ export default function MapBuilder() {
     }
   }, [placedTiles]);
 
-  // Handle map import
+  // Copy/Paste tile handlers
+  const handleCopyTile = useCallback(() => {
+    if (!selectedTileInstanceId) return;
+    const tile = placedTiles.find(t => t.id === selectedTileInstanceId);
+    if (tile) {
+      setCopiedTile(tile);
+      toast({
+        title: 'Tile copiado!',
+        description: 'Use Ctrl+V para colar.',
+      });
+    }
+  }, [selectedTileInstanceId, placedTiles, toast]);
+
+  const handlePasteTile = useCallback(async () => {
+    if (!copiedTile || !activeMap || !user) return;
+    
+    const id = crypto.randomUUID();
+    const newX = Math.min(copiedTile.x + 1, activeMap.grid_width - 1);
+    const newY = Math.min(copiedTile.y + 1, activeMap.grid_height - 1);
+    
+    // Save to database
+    const { error } = await supabase
+      .from('map_tiles')
+      .insert({
+        id,
+        map_id: activeMap.id,
+        user_id: user.id,
+        tile_id: copiedTile.tileId,
+        position_x: newX,
+        position_y: newY,
+        rotation: copiedTile.rotation,
+        scale: copiedTile.scale,
+        is_visible: copiedTile.isVisible,
+      });
+
+    if (error) {
+      console.error('Error pasting tile:', error);
+      return;
+    }
+    
+    const newTile: PlacedTile = {
+      id,
+      tileId: copiedTile.tileId,
+      x: newX,
+      y: newY,
+      rotation: copiedTile.rotation,
+      scale: copiedTile.scale,
+      isVisible: copiedTile.isVisible,
+    };
+    
+    setPlacedTiles(prev => [...prev, newTile]);
+    setSelectedTileInstanceId(newTile.id);
+    
+    const tileDef = getTileById(copiedTile.tileId);
+    toast({
+      title: 'Tile colado!',
+      description: `${tileDef?.name || 'Tile'} foi adicionado ao mapa.`,
+    });
+  }, [copiedTile, activeMap, user, toast]);
+
+  // Keyboard shortcuts for copy/paste
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle if we're focused on the map area and not in an input
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedTileInstanceId) {
+        e.preventDefault();
+        handleCopyTile();
+      }
+      
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v' && copiedTile) {
+        e.preventDefault();
+        handlePasteTile();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleCopyTile, handlePasteTile, selectedTileInstanceId, copiedTile]);
+
+
   const handleMapImport = async (data: {
     mapData: {
       name: string;
