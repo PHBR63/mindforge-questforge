@@ -1,4 +1,5 @@
 export { OnlineAssetBrowser } from './OnlineAssetBrowser';
+export { VTTMapGallery } from './VTTMapGallery';
 export {
   CURATED_ASSET_PACKS,
   ASSET_SOURCES,

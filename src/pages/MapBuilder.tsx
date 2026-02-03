@@ -38,7 +38,8 @@ import { MapDrawing, MapLayer, DrawingState, DrawingTool, DEFAULT_LAYERS } from 
 import { WallEditor } from '@/components/maps/WallEditor';
 import { Model3DLibrary } from '@/components/maps/Model3DLibrary';
 import { Map3DModel } from '@/components/maps/model3DTypes';
-import { OnlineAssetBrowser } from '@/components/maps/onlineAssets';
+import { OnlineAssetBrowser, VTTMapGallery } from '@/components/maps/onlineAssets';
+import { type UVTTImportResult } from '@/components/maps/importExport';
 import { Plus, Map, AlertCircle, Trash2, Grid3X3, Box, Sun, Moon, Flame, Package, Paintbrush, Layers, Columns, Boxes } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -877,6 +878,62 @@ export default function MapBuilder() {
     });
   };
 
+  // Handle VTT map import from gallery
+  const handleVTTMapImport = async (result: UVTTImportResult, filename: string) => {
+    if (!result.mapData || !activeCampaign || !user) return;
+
+    // Create new map with imported data
+    const { data: newMapData, error: mapError } = await supabase
+      .from('maps')
+      .insert({
+        campaign_id: activeCampaign.id,
+        user_id: user.id,
+        name: result.mapData.name || filename,
+        grid_width: result.mapData.gridWidth,
+        grid_height: result.mapData.gridHeight,
+        cell_size: result.mapData.cellSize,
+        background_color: result.mapData.backgroundColor,
+      })
+      .select()
+      .single();
+
+    if (mapError) {
+      throw new Error(mapError.message);
+    }
+
+    const newMap = newMapData as MapData;
+
+    // Create default layers
+    const defaultLayers = DEFAULT_LAYERS.map((l) => ({
+      map_id: newMap.id,
+      user_id: user.id,
+      name: l.name,
+      layer_type: l.layer_type,
+      layer_order: l.layer_order,
+    }));
+    await supabase.from('map_layers').insert(defaultLayers);
+
+    // Import drawings (walls converted to drawings)
+    if (result.drawings && result.drawings.length > 0) {
+      const drawingsToInsert = result.drawings.map((d) => ({
+        map_id: newMap.id,
+        user_id: user.id,
+        tool_type: d.tool_type || 'line',
+        color: d.color || '#6b7280',
+        brush_size: d.brush_size || 3,
+        opacity: d.opacity || 1,
+        points: JSON.stringify(d.points || []),
+        layer: d.layer || 2,
+        is_visible: d.is_visible !== false,
+      }));
+      await supabase.from('map_drawings').insert(drawingsToInsert);
+    }
+
+    // Update state
+    setMaps([newMap, ...maps]);
+    setActiveMap(newMap);
+  };
+
   if (!activeCampaign) {
     return (
       <AppLayout title="Construtor de Mapas">
@@ -960,6 +1017,7 @@ export default function MapBuilder() {
                   />
                   <MapImport onImport={handleMapImport} />
                   <OnlineAssetBrowser />
+                  <VTTMapGallery onImportMap={handleVTTMapImport} />
                 </>
               )}
             </div>
