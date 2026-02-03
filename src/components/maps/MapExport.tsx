@@ -24,6 +24,7 @@ import { MapData, MapToken } from './types';
 import { MapAsset } from './assetTypes';
 import { MapDrawing, MapLayer } from './drawingTypes';
 import { exportToUVTT } from './importExport';
+import { type PlacedTile } from './tilesets';
 
 interface MapExportProps {
   map: MapData;
@@ -31,6 +32,7 @@ interface MapExportProps {
   assets: MapAsset[];
   drawings: MapDrawing[];
   layers: MapLayer[];
+  tiles?: PlacedTile[];
   canvasRef: React.RefObject<HTMLCanvasElement>;
   walls?: Array<{
     start_x: number;
@@ -63,6 +65,7 @@ interface ExportOptions {
   includeTokens: boolean;
   includeAssets: boolean;
   includeDrawings: boolean;
+  includeTiles: boolean;
   includeWalls: boolean;
   includeLights: boolean;
   quality: number;
@@ -75,6 +78,7 @@ export function MapExport({
   assets,
   drawings,
   layers,
+  tiles = [],
   canvasRef,
   walls = [],
   lights = [],
@@ -87,6 +91,7 @@ export function MapExport({
     includeTokens: true,
     includeAssets: true,
     includeDrawings: true,
+    includeTiles: true,
     includeWalls: true,
     includeLights: true,
     quality: 90,
@@ -115,7 +120,7 @@ export function MapExport({
 
   const exportAsJSON = () => {
     const exportData = {
-      version: '1.0',
+      version: '1.1',
       exportedAt: new Date().toISOString(),
       map: {
         name: map.name,
@@ -149,6 +154,8 @@ export function MapExport({
             scale: a.scale,
             layer: a.layer,
             isVisible: a.is_visible,
+            customImageUrl: a.custom_image_url,
+            name: a.name,
           }))
         : [],
       drawings: options.includeDrawings
@@ -159,6 +166,16 @@ export function MapExport({
             opacity: d.opacity,
             points: d.points,
             layer: d.layer,
+          }))
+        : [],
+      tiles: options.includeTiles
+        ? tiles.map((t) => ({
+            tileId: t.tileId,
+            x: t.x,
+            y: t.y,
+            rotation: t.rotation,
+            scale: t.scale,
+            isVisible: t.isVisible,
           }))
         : [],
       layers: layers.map((l) => ({
@@ -390,6 +407,19 @@ export function MapExport({
               />
               <Label htmlFor="includeDrawings" className="font-normal cursor-pointer">
                 Desenhos
+              </Label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="includeTiles"
+                checked={options.includeTiles}
+                onCheckedChange={(checked) =>
+                  setOptions({ ...options, includeTiles: checked as boolean })
+                }
+              />
+              <Label htmlFor="includeTiles" className="font-normal cursor-pointer">
+                Tiles
               </Label>
             </div>
 

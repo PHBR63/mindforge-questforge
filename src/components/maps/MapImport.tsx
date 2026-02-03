@@ -34,6 +34,7 @@ import {
 import { MapData, MapToken } from './types';
 import { MapAsset } from './assetTypes';
 import { MapDrawing } from './drawingTypes';
+import { type PlacedTile } from './tilesets';
 
 interface MapImportProps {
   onImport: (data: {
@@ -48,6 +49,7 @@ interface MapImportProps {
     tokens: Partial<MapToken>[];
     assets: Partial<MapAsset>[];
     drawings: Partial<MapDrawing>[];
+    tiles?: Partial<PlacedTile>[];
     walls?: any[];
     portals?: any[];
     lights?: any[];
@@ -71,6 +73,7 @@ interface ImportPreview {
   tokens: Partial<MapToken>[];
   assets: Partial<MapAsset>[];
   drawings: Partial<MapDrawing>[];
+  tiles?: Partial<PlacedTile>[];
   walls?: any[];
   portals?: any[];
   lights?: any[];
@@ -126,6 +129,17 @@ export function MapImport({ onImport, disabled }: MapImportProps) {
         // Parse our own JSON format
         try {
           const jsonData = JSON.parse(content);
+          
+          // Parse tiles from JSON format
+          const tiles = (jsonData.tiles || []).map((t: any) => ({
+            tileId: t.tileId,
+            x: t.x,
+            y: t.y,
+            rotation: t.rotation || 0,
+            scale: t.scale || 1,
+            isVisible: t.isVisible !== false,
+          }));
+          
           importResult = {
             success: true,
             mapData: {
@@ -138,7 +152,8 @@ export function MapImport({ onImport, disabled }: MapImportProps) {
             tokens: jsonData.tokens || [],
             assets: jsonData.assets || [],
             drawings: jsonData.drawings || [],
-          } as LDtkImportResult;
+            tiles,
+          } as LDtkImportResult & { tiles: any[] };
         } catch {
           setError('Erro ao processar arquivo JSON');
           setStep('error');
@@ -161,6 +176,7 @@ export function MapImport({ onImport, disabled }: MapImportProps) {
         tokens: importResult.tokens,
         assets: 'assets' in importResult ? importResult.assets : [],
         drawings: importResult.drawings,
+        tiles: 'tiles' in importResult ? (importResult as any).tiles : undefined,
         walls: 'walls' in importResult ? importResult.walls : undefined,
         portals: 'portals' in importResult ? importResult.portals : undefined,
         lights: 'lights' in importResult ? importResult.lights : undefined,
@@ -219,6 +235,7 @@ export function MapImport({ onImport, disabled }: MapImportProps) {
         tokens: preview.tokens,
         assets: preview.assets,
         drawings: preview.drawings,
+        tiles: preview.tiles,
         walls: preview.walls,
         portals: preview.portals,
         lights: preview.lights,
@@ -359,6 +376,7 @@ export function MapImport({ onImport, disabled }: MapImportProps) {
                     <div>Tokens: {preview.tokens.length}</div>
                     <div>Assets: {preview.assets.length}</div>
                     <div>Desenhos: {preview.drawings.length}</div>
+                    {preview.tiles && preview.tiles.length > 0 && <div>Tiles: {preview.tiles.length}</div>}
                     {preview.walls && <div>Paredes: {preview.walls.length}</div>}
                     {preview.lights && <div>Luzes: {preview.lights.length}</div>}
                     {preview.portals && <div>Portas: {preview.portals.length}</div>}
