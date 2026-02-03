@@ -19,10 +19,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Download, FileImage, FileJson, FileText } from 'lucide-react';
+import { Download, FileImage, FileJson, FileText, FileBox } from 'lucide-react';
 import { MapData, MapToken } from './types';
 import { MapAsset } from './assetTypes';
 import { MapDrawing, MapLayer } from './drawingTypes';
+import { exportToUVTT } from './importExport';
 
 interface MapExportProps {
   map: MapData;
@@ -31,9 +32,30 @@ interface MapExportProps {
   drawings: MapDrawing[];
   layers: MapLayer[];
   canvasRef: React.RefObject<HTMLCanvasElement>;
+  walls?: Array<{
+    start_x: number;
+    start_y: number;
+    end_x: number;
+    end_y: number;
+  }>;
+  lights?: Array<{
+    position_x: number;
+    position_y: number;
+    range: number;
+    intensity: number;
+    color: string;
+    cast_shadows: boolean;
+  }>;
+  portals?: Array<{
+    position_x: number;
+    position_y: number;
+    width: number;
+    isOpen: boolean;
+    portalType: string;
+  }>;
 }
 
-type ExportFormat = 'png' | 'jpg' | 'json';
+type ExportFormat = 'png' | 'jpg' | 'json' | 'uvtt';
 
 interface ExportOptions {
   format: ExportFormat;
@@ -41,6 +63,8 @@ interface ExportOptions {
   includeTokens: boolean;
   includeAssets: boolean;
   includeDrawings: boolean;
+  includeWalls: boolean;
+  includeLights: boolean;
   quality: number;
   filename: string;
 }
@@ -52,6 +76,9 @@ export function MapExport({
   drawings,
   layers,
   canvasRef,
+  walls = [],
+  lights = [],
+  portals = [],
 }: MapExportProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [options, setOptions] = useState<ExportOptions>({
@@ -60,6 +87,8 @@ export function MapExport({
     includeTokens: true,
     includeAssets: true,
     includeDrawings: true,
+    includeWalls: true,
+    includeLights: true,
     quality: 90,
     filename: map.name.replace(/[^a-z0-9]/gi, '_').toLowerCase(),
   });
@@ -71,6 +100,8 @@ export function MapExport({
     try {
       if (options.format === 'json') {
         exportAsJSON();
+      } else if (options.format === 'uvtt') {
+        exportAsUVTT();
       } else {
         await exportAsImage();
       }
@@ -146,6 +177,24 @@ export function MapExport({
     downloadBlob(blob, `${options.filename}.json`);
   };
 
+  const exportAsUVTT = () => {
+    const uvttContent = exportToUVTT({
+      mapName: map.name,
+      gridWidth: map.grid_width,
+      gridHeight: map.grid_height,
+      cellSize: map.cell_size,
+      walls: options.includeWalls ? walls : [],
+      lights: options.includeLights ? lights : undefined,
+      portals: portals.length > 0 ? portals : undefined,
+      pixelsPerGrid: 140,
+    });
+
+    const blob = new Blob([uvttContent], {
+      type: 'application/json',
+    });
+    downloadBlob(blob, `${options.filename}.uvtt`);
+  };
+
   const exportAsImage = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -193,6 +242,8 @@ export function MapExport({
         return <FileImage className="w-4 h-4" />;
       case 'json':
         return <FileJson className="w-4 h-4" />;
+      case 'uvtt':
+        return <FileBox className="w-4 h-4" />;
       default:
         return <FileText className="w-4 h-4" />;
     }
@@ -256,6 +307,12 @@ export function MapExport({
                   <div className="flex items-center gap-2">
                     <FileJson className="w-4 h-4" />
                     JSON (Para importação)
+                  </div>
+                </SelectItem>
+                <SelectItem value="uvtt">
+                  <div className="flex items-center gap-2">
+                    <FileBox className="w-4 h-4" />
+                    Universal VTT (Roll20, Foundry)
                   </div>
                 </SelectItem>
               </SelectContent>
@@ -335,6 +392,36 @@ export function MapExport({
                 Desenhos
               </Label>
             </div>
+
+            {options.format === 'uvtt' && (
+              <>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="includeWalls"
+                    checked={options.includeWalls}
+                    onCheckedChange={(checked) =>
+                      setOptions({ ...options, includeWalls: checked as boolean })
+                    }
+                  />
+                  <Label htmlFor="includeWalls" className="font-normal cursor-pointer">
+                    Paredes (Line of Sight)
+                  </Label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="includeLights"
+                    checked={options.includeLights}
+                    onCheckedChange={(checked) =>
+                      setOptions({ ...options, includeLights: checked as boolean })
+                    }
+                  />
+                  <Label htmlFor="includeLights" className="font-normal cursor-pointer">
+                    Luzes
+                  </Label>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
