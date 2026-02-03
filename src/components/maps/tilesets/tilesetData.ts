@@ -93,6 +93,29 @@ const spiderwebSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32
 
 const bonePileSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><ellipse fill="#F5F5DC" cx="8" cy="20" rx="6" ry="2"/><ellipse fill="#F5F5DC" cx="24" cy="22" rx="6" ry="2"/><ellipse fill="#FFFFF0" cx="16" cy="18" rx="8" ry="3"/><ellipse fill="#F5F5DC" cx="12" cy="14" rx="4" ry="6" transform="rotate(-30 12 14)"/><ellipse fill="#F5F5DC" cx="22" cy="16" rx="4" ry="5" transform="rotate(20 22 16)"/><circle fill="#FFFFF0" cx="16" cy="8" r="6"/><circle fill="#333" cx="13" cy="7" r="1.5"/><circle fill="#333" cx="19" cy="7" r="1.5"/></svg>`;
 
+const spikeTrapSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect fill="#4a4a4a" width="32" height="32"/><polygon fill="#888" points="8,28 6,16 10,16"/><polygon fill="#888" points="16,28 14,12 18,12"/><polygon fill="#888" points="24,28 22,16 26,16"/><polygon fill="#777" points="4,28 2,20 6,20"/><polygon fill="#777" points="12,28 10,18 14,18"/><polygon fill="#777" points="20,28 18,14 22,14"/><polygon fill="#777" points="28,28 26,20 30,20"/><rect fill="#333" x="0" y="28" width="32" height="4"/></svg>`;
+
+const stairsUpSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect fill="#4a4a4a" width="32" height="32"/><rect fill="#666" x="0" y="24" width="32" height="8"/><rect fill="#777" x="4" y="18" width="24" height="6"/><rect fill="#888" x="8" y="12" width="16" height="6"/><rect fill="#999" x="12" y="6" width="8" height="6"/><polygon fill="#22c55e" points="16,2 12,8 20,8" opacity="0.8"/></svg>`;
+
+const stairsDownSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect fill="#4a4a4a" width="32" height="32"/><rect fill="#333" x="12" y="24" width="8" height="6"/><rect fill="#444" x="8" y="18" width="16" height="6"/><rect fill="#555" x="4" y="12" width="24" height="6"/><rect fill="#666" x="0" y="6" width="32" height="6"/><polygon fill="#ef4444" points="16,30 12,24 20,24" opacity="0.8"/></svg>`;
+
+const pressurePlateSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect fill="#4a4a4a" width="32" height="32"/><rect fill="#666" x="4" y="12" width="24" height="8" rx="1"/><rect fill="#777" x="6" y="14" width="20" height="4"/><rect fill="#555" x="2" y="20" width="28" height="4"/><circle fill="#ef4444" cx="16" cy="16" r="2" opacity="0.6"/></svg>`;
+
+const pitTrapSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect fill="#4a4a4a" width="32" height="32"/><rect fill="#111" x="4" y="4" width="24" height="24" rx="2"/><rect fill="#222" x="6" y="6" width="20" height="20"/><rect fill="#1a1a1a" x="8" y="8" width="16" height="16"/><polygon fill="#555" points="4,4 8,8 8,24 4,28"/><polygon fill="#666" points="28,4 24,8 24,24 28,28"/></svg>`;
+
+// Floor variation tiles
+const marbleFloorSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect fill="#e8e8e8" width="32" height="32"/><path fill="#d0d0d0" d="M0,0 Q8,4 16,2 Q24,0 32,4 L32,8 Q24,4 16,6 Q8,8 0,4 Z" opacity="0.5"/><path fill="#c8c8c8" d="M0,16 Q8,12 16,14 Q24,16 32,12 L32,20 Q24,24 16,22 Q8,20 0,24 Z" opacity="0.4"/><rect fill="#ddd" x="15" y="0" width="2" height="32" opacity="0.3"/><rect fill="#ddd" x="0" y="15" width="32" height="2" opacity="0.3"/></svg>`;
+
+const mossyStoneFloorSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect fill="#4a4a4a" width="32" height="32"/><rect fill="#3d3d3d" x="0" y="0" width="15" height="15"/><rect fill="#525252" x="17" y="17" width="15" height="15"/><rect fill="#333" x="15" y="0" width="2" height="32"/><rect fill="#333" x="0" y="15" width="32" height="2"/><circle fill="#2d5a2d" cx="5" cy="5" r="3" opacity="0.6"/><circle fill="#3d6a3d" cx="25" cy="8" r="4" opacity="0.5"/><circle fill="#2d5a2d" cx="10" cy="25" r="3" opacity="0.6"/><circle fill="#3d6a3d" cx="28" cy="28" r="2" opacity="0.5"/></svg>`;
+
+const crackedFloorSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect fill="#5a5a5a" width="32" height="32"/><path fill="none" stroke="#333" stroke-width="1" d="M8,0 L12,8 L8,16 L14,24 L10,32"/><path fill="none" stroke="#333" stroke-width="1" d="M20,0 L24,6 L20,12 L26,20 L22,32"/><path fill="none" stroke="#333" stroke-width="1" d="M0,10 L6,12 L12,8 L20,14 L32,10"/><path fill="none" stroke="#333" stroke-width="1" d="M0,22 L8,20 L16,24 L24,20 L32,24"/></svg>`;
+
+const sandFloorSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect fill="#d4b896" width="32" height="32"/><circle fill="#c4a886" cx="5" cy="8" r="2"/><circle fill="#e4c8a6" cx="15" cy="5" r="3"/><circle fill="#c4a886" cx="28" cy="12" r="2"/><circle fill="#e4c8a6" cx="8" cy="20" r="2"/><circle fill="#c4a886" cx="22" cy="25" r="3"/><circle fill="#e4c8a6" cx="12" cy="28" r="2"/><circle fill="#b49876" cx="26" cy="6" r="1"/><circle fill="#b49876" cx="4" cy="26" r="1"/></svg>`;
+
+const snowFloorSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect fill="#f0f4f8" width="32" height="32"/><circle fill="#fff" cx="6" cy="6" r="4"/><circle fill="#e8ecf0" cx="20" cy="8" r="5"/><circle fill="#fff" cx="10" cy="18" r="3"/><circle fill="#e8ecf0" cx="26" cy="20" r="4"/><circle fill="#fff" cx="16" cy="28" r="3"/><circle fill="#dce0e4" cx="4" cy="28" r="2"/></svg>`;
+
+const rugFloorSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect fill="#8B4513" width="32" height="32"/><rect fill="#722F37" x="2" y="2" width="28" height="28" rx="1"/><rect fill="#8B2252" x="4" y="4" width="24" height="24"/><rect fill="#722F37" x="6" y="6" width="20" height="20"/><rect fill="#8B2252" x="14" y="8" width="4" height="16"/><rect fill="#8B2252" x="8" y="14" width="16" height="4"/></svg>`;
+
 // Water tiles
 const waterSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect fill="#1E90FF" width="32" height="32"/><path fill="#4169E1" d="M0,8 Q8,4 16,8 Q24,12 32,8 L32,16 Q24,20 16,16 Q8,12 0,16 Z"/><path fill="#00BFFF" d="M0,20 Q8,16 16,20 Q24,24 32,20 L32,28 Q24,32 16,28 Q8,24 0,28 Z"/></svg>`;
 
@@ -106,6 +129,12 @@ export const EMBEDDED_TILES: TileDefinition[] = [
   { id: 'floor-dirt', name: 'Terra', category: 'floors', imageData: createSvgDataUrl(dirtFloorSvg), size: 1, rotatable: true },
   { id: 'floor-grass', name: 'Grama', category: 'floors', imageData: createSvgDataUrl(grassFloorSvg), size: 1, rotatable: true },
   { id: 'floor-cobblestone', name: 'Paralelepípedo', category: 'floors', imageData: createSvgDataUrl(cobblestoneFloorSvg), size: 1, rotatable: true },
+  { id: 'floor-marble', name: 'Mármore', category: 'floors', imageData: createSvgDataUrl(marbleFloorSvg), size: 1, rotatable: true },
+  { id: 'floor-mossy-stone', name: 'Pedra com Musgo', category: 'floors', imageData: createSvgDataUrl(mossyStoneFloorSvg), size: 1, rotatable: true },
+  { id: 'floor-cracked', name: 'Piso Rachado', category: 'floors', imageData: createSvgDataUrl(crackedFloorSvg), size: 1, rotatable: true },
+  { id: 'floor-sand', name: 'Areia', category: 'floors', imageData: createSvgDataUrl(sandFloorSvg), size: 1, rotatable: true },
+  { id: 'floor-snow', name: 'Neve', category: 'floors', imageData: createSvgDataUrl(snowFloorSvg), size: 1, rotatable: true },
+  { id: 'floor-rug', name: 'Tapete', category: 'floors', imageData: createSvgDataUrl(rugFloorSvg), size: 1, rotatable: true },
   
   // Walls
   { id: 'wall-stone', name: 'Parede de Pedra', category: 'walls', imageData: createSvgDataUrl(stoneWallSvg), size: 1, rotatable: false },
@@ -136,6 +165,11 @@ export const EMBEDDED_TILES: TileDefinition[] = [
   { id: 'dungeon-skull', name: 'Crânio', category: 'dungeon', imageData: createSvgDataUrl(skullSvg), size: 1, rotatable: true },
   { id: 'dungeon-spiderweb', name: 'Teia de Aranha', category: 'dungeon', imageData: createSvgDataUrl(spiderwebSvg), size: 1, rotatable: true },
   { id: 'dungeon-bones', name: 'Ossos', category: 'dungeon', imageData: createSvgDataUrl(bonePileSvg), size: 1, rotatable: true },
+  { id: 'dungeon-spike-trap', name: 'Armadilha de Espinhos', category: 'dungeon', imageData: createSvgDataUrl(spikeTrapSvg), size: 1, rotatable: true },
+  { id: 'dungeon-stairs-up', name: 'Escada Subindo', category: 'dungeon', imageData: createSvgDataUrl(stairsUpSvg), size: 1, rotatable: true },
+  { id: 'dungeon-stairs-down', name: 'Escada Descendo', category: 'dungeon', imageData: createSvgDataUrl(stairsDownSvg), size: 1, rotatable: true },
+  { id: 'dungeon-pressure-plate', name: 'Placa de Pressão', category: 'dungeon', imageData: createSvgDataUrl(pressurePlateSvg), size: 1, rotatable: false },
+  { id: 'dungeon-pit-trap', name: 'Fosso', category: 'dungeon', imageData: createSvgDataUrl(pitTrapSvg), size: 1, rotatable: false },
   
   // Water
   { id: 'water-water', name: 'Água', category: 'water', imageData: createSvgDataUrl(waterSvg), size: 1, rotatable: false },
