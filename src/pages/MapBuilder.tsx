@@ -22,12 +22,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MapGrid } from '@/components/maps/MapGrid';
+import { MapScene3D } from '@/components/maps/MapScene3D';
 import { TokenPanel } from '@/components/maps/TokenPanel';
 import { MapToolbar } from '@/components/maps/MapToolbar';
 import { MapData, MapToken } from '@/components/maps/types';
-import { Plus, Map, AlertCircle, Trash2 } from 'lucide-react';
+import { Plus, Map, AlertCircle, Trash2, Grid3X3, Box, Sun, Moon, Flame } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+
+type ViewMode = '2d' | '3d';
+type Environment3D = 'day' | 'night' | 'dungeon';
 
 export default function MapBuilder() {
   const { activeCampaign } = useCampaignContext();
@@ -42,6 +47,8 @@ export default function MapBuilder() {
   const [isSaving, setIsSaving] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newMapName, setNewMapName] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>('2d');
+  const [environment3D, setEnvironment3D] = useState<Environment3D>('dungeon');
 
   // Load maps
   useEffect(() => {
@@ -345,26 +352,87 @@ export default function MapBuilder() {
         </div>
       ) : activeMap ? (
         <div className="space-y-4">
-          <MapToolbar
-            map={activeMap}
-            isSaving={isSaving}
-            onSave={handleSaveMap}
-            onMapUpdate={handleMapUpdate}
-          />
+          <div className="flex items-center justify-between">
+            <MapToolbar
+              map={activeMap}
+              isSaving={isSaving}
+              onSave={handleSaveMap}
+              onMapUpdate={handleMapUpdate}
+            />
+            
+            <div className="flex items-center gap-4">
+              {/* Environment selector for 3D */}
+              {viewMode === '3d' && (
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm text-muted-foreground">Ambiente:</Label>
+                  <div className="flex gap-1">
+                    <Button
+                      variant={environment3D === 'day' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setEnvironment3D('day')}
+                    >
+                      <Sun className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant={environment3D === 'night' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setEnvironment3D('night')}
+                    >
+                      <Moon className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant={environment3D === 'dungeon' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setEnvironment3D('dungeon')}
+                    >
+                      <Flame className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
+              {/* 2D/3D Toggle */}
+              <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+                <TabsList>
+                  <TabsTrigger value="2d" className="gap-2">
+                    <Grid3X3 className="w-4 h-4" />
+                    2D
+                  </TabsTrigger>
+                  <TabsTrigger value="3d" className="gap-2">
+                    <Box className="w-4 h-4" />
+                    3D
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+          </div>
 
           <div className="flex gap-4">
-            <div className="flex-1">
-              <MapGrid
-                gridWidth={activeMap.grid_width}
-                gridHeight={activeMap.grid_height}
-                cellSize={activeMap.cell_size}
-                backgroundColor={activeMap.background_color || '#1a1a2e'}
-                tokens={tokens}
-                selectedTokenId={selectedTokenId}
-                onTokenMove={handleTokenMove}
-                onTokenSelect={setSelectedTokenId}
-                onCellClick={(x, y) => console.log('Cell clicked:', x, y)}
-              />
+            <div className="flex-1" style={{ height: 'calc(100vh - 20rem)' }}>
+              {viewMode === '2d' ? (
+                <MapGrid
+                  gridWidth={activeMap.grid_width}
+                  gridHeight={activeMap.grid_height}
+                  cellSize={activeMap.cell_size}
+                  backgroundColor={activeMap.background_color || '#1a1a2e'}
+                  tokens={tokens}
+                  selectedTokenId={selectedTokenId}
+                  onTokenMove={handleTokenMove}
+                  onTokenSelect={setSelectedTokenId}
+                  onCellClick={(x, y) => console.log('Cell clicked:', x, y)}
+                />
+              ) : (
+                <MapScene3D
+                  gridWidth={activeMap.grid_width}
+                  gridHeight={activeMap.grid_height}
+                  cellSize={activeMap.cell_size / 10} // Scale down for 3D
+                  backgroundColor={activeMap.background_color || '#1a1a2e'}
+                  tokens={tokens}
+                  selectedTokenId={selectedTokenId}
+                  onTokenSelect={setSelectedTokenId}
+                  environment={environment3D}
+                />
+              )}
             </div>
 
             <TokenPanel
