@@ -38,6 +38,7 @@ import { MapDrawing, MapLayer, DrawingState, DrawingTool, DEFAULT_LAYERS } from 
 import { WallEditor } from '@/components/maps/WallEditor';
 import { Model3DLibrary } from '@/components/maps/Model3DLibrary';
 import { Map3DModel } from '@/components/maps/model3DTypes';
+import { OnlineAssetBrowser } from '@/components/maps/onlineAssets';
 import { Plus, Map, AlertCircle, Trash2, Grid3X3, Box, Sun, Moon, Flame, Package, Paintbrush, Layers, Columns, Boxes } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -958,6 +959,7 @@ export default function MapBuilder() {
                     canvasRef={{ current: mapGridRef.current?.getCanvas() || null }}
                   />
                   <MapImport onImport={handleMapImport} />
+                  <OnlineAssetBrowser />
                 </>
               )}
             </div>
