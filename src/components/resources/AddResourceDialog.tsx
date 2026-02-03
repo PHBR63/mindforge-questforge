@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -91,15 +91,12 @@ export function AddResourceDialog({ open, onOpenChange, onSubmit, onSubmitMultip
   const [uploadProgress, setUploadProgress] = useState(0);
   const [currentUploadIndex, setCurrentUploadIndex] = useState(0);
   const [useUrl, setUseUrl] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-
+  const processFiles = useCallback((files: File[]) => {
     const newSelectedFiles: SelectedFile[] = [];
 
     for (const file of files) {
-      // Validate file size
       const validation = validateFile(file);
       if (!validation.valid) {
         toast({ 
@@ -113,7 +110,6 @@ export function AddResourceDialog({ open, onOpenChange, onSubmit, onSubmitMultip
       const detectedType = detectResourceType(file);
       const fileName = file.name.replace(/\.[^/.]+$/, '');
       
-      // Create preview for images
       let previewUrl: string | null = null;
       if (file.type.startsWith('image/')) {
         previewUrl = URL.createObjectURL(file);
@@ -130,10 +126,39 @@ export function AddResourceDialog({ open, onOpenChange, onSubmit, onSubmitMultip
     if (newSelectedFiles.length > 0) {
       setSelectedFiles(prev => [...prev, ...newSelectedFiles]);
       
-      // Auto-fill name if single file and name is empty
       if (newSelectedFiles.length === 1 && selectedFiles.length === 0 && !formData.name.trim()) {
         setFormData(prev => ({ ...prev, name: newSelectedFiles[0].name }));
       }
+    }
+  }, [toast, selectedFiles.length, formData.name]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      processFiles(files);
+    }
+  }, [processFiles]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      processFiles(files);
     }
   };
 
@@ -326,9 +351,13 @@ export function AddResourceDialog({ open, onOpenChange, onSubmit, onSubmitMultip
             <div className="space-y-2">
               <Label>Arquivos</Label>
               <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
                 className={cn(
-                  "border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer",
+                  "border-2 border-dashed rounded-lg p-4 text-center transition-all cursor-pointer",
                   "hover:border-primary/50 hover:bg-primary/5",
+                  isDragging && "border-primary bg-primary/10 scale-[1.02]",
                   selectedFiles.length > 0 ? "border-primary bg-primary/5" : "border-border"
                 )}
                 onClick={() => fileInputRef.current?.click()}
