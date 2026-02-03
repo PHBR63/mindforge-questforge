@@ -27,6 +27,8 @@ import {
   RotateCcw,
   Move,
   Maximize2,
+  Play,
+  Pause,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Map3DModel, validate3DFile, SUPPORTED_3D_FORMATS } from './model3DTypes';
@@ -35,6 +37,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface Model3DLibraryProps {
   mapId: string;
@@ -386,6 +395,56 @@ export function Model3DLibrary({
                 max={180}
                 step={15}
               />
+            </div>
+
+            {/* Animation controls */}
+            <div className="space-y-2 pt-2 border-t border-border">
+              <Label className="text-xs">Animação</Label>
+              <Select
+                value={selectedModel.animation_name || ''}
+                onValueChange={(v) =>
+                  onModelUpdate(selectedModel.id, {
+                    animation_name: v || null,
+                    animation_playing: !!v,
+                  })
+                }
+              >
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue placeholder="Nenhuma animação" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Nenhuma</SelectItem>
+                  <SelectItem value="idle">Idle</SelectItem>
+                  <SelectItem value="walk">Walk</SelectItem>
+                  <SelectItem value="run">Run</SelectItem>
+                  <SelectItem value="attack">Attack</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {selectedModel.animation_name && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant={selectedModel.animation_playing ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-7 flex-1 gap-1"
+                    onClick={() =>
+                      onModelUpdate(selectedModel.id, {
+                        animation_playing: !selectedModel.animation_playing,
+                      })
+                    }
+                  >
+                    {selectedModel.animation_playing ? (
+                      <>
+                        <Pause className="w-3 h-3" /> Pausar
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-3 h-3" /> Reproduzir
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         )}

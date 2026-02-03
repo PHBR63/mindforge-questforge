@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { useGLTF, TransformControls, Html } from '@react-three/drei';
-import { useThree } from '@react-three/fiber';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Map3DModel } from './model3DTypes';
 
@@ -13,8 +13,10 @@ interface TransformableModel3DProps {
   gridHeight: number;
   isSelected: boolean;
   transformMode: TransformMode;
+  snapToGrid: boolean;
   onSelect: () => void;
   onTransformEnd: (updates: Partial<Map3DModel>) => void;
+  onAnimationsFound?: (animations: string[]) => void;
 }
 
 export function TransformableModel3D({
@@ -24,13 +26,16 @@ export function TransformableModel3D({
   gridHeight,
   isSelected,
   transformMode,
+  snapToGrid,
   onSelect,
   onTransformEnd,
+  onAnimationsFound,
 }: TransformableModel3DProps) {
-  const { scene } = useGLTF(model.file_url);
+  const { scene, animations } = useGLTF(model.file_url);
   const groupRef = useRef<THREE.Group>(null);
-  const { camera, gl } = useThree();
   const [isTransforming, setIsTransforming] = useState(false);
+  const [mixer] = useState(() => new THREE.AnimationMixer(scene));
+  const [currentAction, setCurrentAction] = useState<THREE.AnimationAction | null>(null);
 
   // Center offset
   const centerX = (gridWidth * cellSize) / 2;
@@ -64,6 +69,53 @@ export function TransformableModel3D({
     return clone;
   }, [scene]);
 
+  // Report available animations
+  useEffect(() => {
+    if (animations.length > 0 && onAnimationsFound) {
+      const animNames = animations.map((a, i) => a.name || `Animation ${i + 1}`);
+      onAnimationsFound(animNames);
+    }
+  }, [animations, onAnimationsFound]);
+
+  // Handle animation playback
+  useEffect(() => {
+    if (!model.animation_name || animations.length === 0) {
+      if (currentAction) {
+        currentAction.fadeOut(0.3);
+        setCurrentAction(null);
+      }
+      return;
+    }
+
+    const clip = animations.find(
+      (a, i) => a.name === model.animation_name || `Animation ${i + 1}` === model.animation_name
+    );
+
+    if (clip) {
+      const action = mixer.clipAction(clip);
+      
+      if (model.animation_playing) {
+        action.reset().fadeIn(0.3).play();
+        setCurrentAction(action);
+      } else {
+        action.paused = true;
+        action.play();
+        setCurrentAction(action);
+      }
+
+      return () => {
+        action.fadeOut(0.3);
+      };
+    }
+  }, [model.animation_name, model.animation_playing, animations, mixer]);
+
+  // Update animation mixer
+  useFrame((_, delta) => {
+    if (model.animation_playing) {
+      mixer.update(delta);
+    }
+  });
+
   const handleTransformEnd = () => {
     if (!groupRef.current) return;
     setIsTransforming(false);
@@ -73,9 +125,16 @@ export function TransformableModel3D({
     const scl = groupRef.current.scale;
 
     // Convert back to model coordinates
-    const newX = (pos.x + centerX) / cellSize;
-    const newY = (pos.z + centerZ) / cellSize;
-    const newZ = pos.y / cellSize;
+    let newX = (pos.x + centerX) / cellSize;
+    let newY = (pos.z + centerZ) / cellSize;
+    let newZ = pos.y / cellSize;
+
+    // Apply snap to grid if enabled
+    if (snapToGrid) {
+      newX = Math.round(newX);
+      newY = Math.round(newY);
+      newZ = Math.round(newZ * 2) / 2; // Snap to 0.5 increments for height
+    }
 
     const newRotX = (rot.x * 180) / Math.PI;
     const newRotY = (rot.y * 180) / Math.PI;
@@ -84,13 +143,16 @@ export function TransformableModel3D({
     // Use uniform scale (average of x, y, z)
     const newScale = (scl.x + scl.y + scl.z) / 3;
 
+    // Snap rotation to 15-degree increments if snap enabled
+    const snapRotation = (r: number) => (snapToGrid ? Math.round(r / 15) * 15 : Math.round(r));
+
     onTransformEnd({
       position_x: Math.round(newX * 100) / 100,
       position_y: Math.round(newY * 100) / 100,
       position_z: Math.round(newZ * 100) / 100,
-      rotation_x: Math.round(newRotX),
-      rotation_y: Math.round(newRotY),
-      rotation_z: Math.round(newRotZ),
+      rotation_x: snapRotation(newRotX),
+      rotation_y: snapRotation(newRotY),
+      rotation_z: snapRotation(newRotZ),
       scale: Math.round(newScale * 100) / 100,
     });
   };
@@ -117,6 +179,16 @@ export function TransformableModel3D({
           </mesh>
         )}
 
+        {/* Animation indicator */}
+        {model.animation_playing && (
+          <Html position={[0, 2, 0]} center style={{ pointerEvents: 'none' }}>
+            <div className="flex items-center gap-1 bg-green-500/80 px-2 py-0.5 rounded text-[10px] text-white">
+              <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+              Animando
+            </div>
+          </Html>
+        )}
+
         {/* Name label */}
         {isSelected && (
           <Html
@@ -126,6 +198,7 @@ export function TransformableModel3D({
           >
             <div className="bg-card/90 backdrop-blur-sm px-2 py-1 rounded text-xs text-foreground whitespace-nowrap border border-primary">
               {model.name}
+              {snapToGrid && <span className="ml-1 text-muted-foreground">(Snap)</span>}
             </div>
           </Html>
         )}
@@ -137,6 +210,9 @@ export function TransformableModel3D({
           object={groupRef.current}
           mode={transformMode}
           size={0.7}
+          translationSnap={snapToGrid ? cellSize : undefined}
+          rotationSnap={snapToGrid ? Math.PI / 12 : undefined}
+          scaleSnap={snapToGrid ? 0.25 : undefined}
           onMouseDown={() => setIsTransforming(true)}
           onMouseUp={handleTransformEnd}
         />

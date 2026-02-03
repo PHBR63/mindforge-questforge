@@ -31,6 +31,7 @@ interface MapScene3DProps {
 
 interface SceneProps extends MapScene3DProps {
   transformMode: TransformMode;
+  snapToGrid: boolean;
 }
 
 function Scene({
@@ -47,6 +48,7 @@ function Scene({
   onModel3DUpdate,
   environment = 'dungeon',
   transformMode,
+  snapToGrid,
 }: SceneProps) {
   const totalWidth = gridWidth * cellSize;
   const totalHeight = gridHeight * cellSize;
@@ -157,6 +159,7 @@ function Scene({
             gridHeight={gridHeight}
             isSelected={selectedModel3DId === model.id}
             transformMode={transformMode}
+            snapToGrid={snapToGrid}
             onSelect={() => {
               onModel3DSelect?.(model.id);
               onTokenSelect(null);
@@ -182,6 +185,7 @@ function Scene({
 
 export function MapScene3D(props: MapScene3DProps) {
   const [transformMode, setTransformMode] = useState<TransformMode>('translate');
+  const [snapToGrid, setSnapToGrid] = useState(false);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -197,6 +201,9 @@ export function MapScene3D(props: MapScene3DProps) {
           break;
         case 's':
           setTransformMode('scale');
+          break;
+        case 'x':
+          setSnapToGrid((prev) => !prev);
           break;
         case 'escape':
           props.onModel3DSelect?.(null);
@@ -217,12 +224,14 @@ export function MapScene3D(props: MapScene3DProps) {
           mode={transformMode}
           onModeChange={setTransformMode}
           hasSelection={!!props.selectedModel3DId}
+          snapToGrid={snapToGrid}
+          onSnapToggle={setSnapToGrid}
         />
       </div>
 
       <Canvas shadows>
         <Suspense fallback={null}>
-          <Scene {...props} transformMode={transformMode} />
+          <Scene {...props} transformMode={transformMode} snapToGrid={snapToGrid} />
         </Suspense>
       </Canvas>
     </div>

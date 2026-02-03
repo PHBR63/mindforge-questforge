@@ -1,12 +1,14 @@
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Move, RotateCcw, Maximize2, Focus } from 'lucide-react';
+import { Move, RotateCcw, Maximize2, Focus, Grid3X3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type TransformMode = 'translate' | 'rotate' | 'scale';
@@ -15,6 +17,8 @@ interface Transform3DToolbarProps {
   mode: TransformMode;
   onModeChange: (mode: TransformMode) => void;
   hasSelection: boolean;
+  snapToGrid: boolean;
+  onSnapToggle: (snap: boolean) => void;
   onFocusSelected?: () => void;
 }
 
@@ -22,6 +26,8 @@ export function Transform3DToolbar({
   mode,
   onModeChange,
   hasSelection,
+  snapToGrid,
+  onSnapToggle,
   onFocusSelected,
 }: Transform3DToolbarProps) {
   return (
@@ -70,6 +76,23 @@ export function Transform3DToolbar({
             </Button>
           </TooltipTrigger>
           <TooltipContent>Escalar (S)</TooltipContent>
+        </Tooltip>
+
+        <Separator orientation="vertical" className="h-6 mx-1" />
+
+        {/* Snap to Grid toggle */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-1.5 px-2">
+              <Grid3X3 className={cn('w-3.5 h-3.5', snapToGrid ? 'text-primary' : 'text-muted-foreground')} />
+              <Switch
+                checked={snapToGrid}
+                onCheckedChange={onSnapToggle}
+                className="scale-75"
+              />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>Snap ao Grid (X)</TooltipContent>
         </Tooltip>
 
         {onFocusSelected && (
