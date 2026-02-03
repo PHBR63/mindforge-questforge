@@ -697,6 +697,59 @@ export type Database = {
           },
         ]
       }
+      map_tiles: {
+        Row: {
+          created_at: string
+          id: string
+          is_visible: boolean | null
+          layer: number | null
+          map_id: string
+          position_x: number
+          position_y: number
+          rotation: number
+          scale: number
+          tile_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_visible?: boolean | null
+          layer?: number | null
+          map_id: string
+          position_x?: number
+          position_y?: number
+          rotation?: number
+          scale?: number
+          tile_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_visible?: boolean | null
+          layer?: number | null
+          map_id?: string
+          position_x?: number
+          position_y?: number
+          rotation?: number
+          scale?: number
+          tile_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "map_tiles_map_id_fkey"
+            columns: ["map_id"]
+            isOneToOne: false
+            referencedRelation: "maps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       map_tokens: {
         Row: {
           color: string | null

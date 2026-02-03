@@ -124,7 +124,7 @@ export default function MapBuilder() {
     loadMaps();
   }, [activeCampaign, toast]);
 
-  // Load tokens, assets, drawings, and layers when map changes
+  // Load tokens, assets, drawings, layers, and tiles when map changes
   useEffect(() => {
     if (!activeMap) {
       setTokens([]);
@@ -132,11 +132,12 @@ export default function MapBuilder() {
       setDrawings([]);
       setLayers([]);
       setModels3D([]);
+      setPlacedTiles([]);
       return;
     }
 
     const loadMapData = async () => {
-      const [tokensResult, assetsResult, drawingsResult, layersResult, models3DResult] = await Promise.all([
+      const [tokensResult, assetsResult, drawingsResult, layersResult, models3DResult, tilesResult] = await Promise.all([
         supabase
           .from('map_tokens')
           .select('*')
@@ -159,6 +160,11 @@ export default function MapBuilder() {
           .order('layer_order', { ascending: true }),
         supabase
           .from('map_3d_models')
+          .select('*')
+          .eq('map_id', activeMap.id)
+          .order('layer', { ascending: true }),
+        supabase
+          .from('map_tiles')
           .select('*')
           .eq('map_id', activeMap.id)
           .order('layer', { ascending: true }),
@@ -208,6 +214,21 @@ export default function MapBuilder() {
           scale: Number(m.scale),
         })) as Map3DModel[];
         setModels3D(typedModels);
+      }
+
+      if (tilesResult.error) {
+        console.error('Error loading tiles:', tilesResult.error);
+      } else {
+        const loadedTiles: PlacedTile[] = (tilesResult.data || []).map((t: any) => ({
+          id: t.id,
+          tileId: t.tile_id,
+          x: t.position_x,
+          y: t.position_y,
+          rotation: t.rotation,
+          scale: Number(t.scale),
+          isVisible: t.is_visible ?? true,
+        }));
+        setPlacedTiles(loadedTiles);
       }
     };
 
@@ -795,14 +816,42 @@ export default function MapBuilder() {
   };
 
   // Tileset handlers
-  const handleTilePlaceStart = useCallback((tile: TileDefinition) => {
-    if (!activeMap) return;
-    // Place tile at center of map
+  const handleTilePlaceStart = useCallback(async (tile: TileDefinition) => {
+    if (!activeMap || !user) return;
+    
+    const tileId = crypto.randomUUID();
+    const x = Math.floor(activeMap.grid_width / 2);
+    const y = Math.floor(activeMap.grid_height / 2);
+    
+    // Save to database
+    const { error } = await supabase
+      .from('map_tiles')
+      .insert({
+        id: tileId,
+        map_id: activeMap.id,
+        user_id: user.id,
+        tile_id: tile.id,
+        position_x: x,
+        position_y: y,
+        rotation: 0,
+        scale: 1,
+        is_visible: true,
+      });
+
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao adicionar tile',
+        description: error.message,
+      });
+      return;
+    }
+
     const newTile: PlacedTile = {
-      id: crypto.randomUUID(),
+      id: tileId,
       tileId: tile.id,
-      x: Math.floor(activeMap.grid_width / 2),
-      y: Math.floor(activeMap.grid_height / 2),
+      x,
+      y,
       rotation: 0,
       scale: 1,
       isVisible: true,
@@ -813,23 +862,80 @@ export default function MapBuilder() {
       title: 'Tile adicionado',
       description: `${tile.name} foi adicionado ao mapa.`,
     });
-  }, [activeMap, placedTiles, toast]);
+  }, [activeMap, user, placedTiles, toast]);
 
-  const handleTileUpdate = useCallback((id: string, updates: Partial<PlacedTile>) => {
+  const handleTileUpdate = useCallback(async (id: string, updates: Partial<PlacedTile>) => {
+    // Update local state immediately for responsiveness
     setPlacedTiles(placedTiles.map(t => t.id === id ? { ...t, ...updates } : t));
+    
+    // Map PlacedTile fields to database fields
+    const dbUpdates: Record<string, any> = {};
+    if (updates.x !== undefined) dbUpdates.position_x = updates.x;
+    if (updates.y !== undefined) dbUpdates.position_y = updates.y;
+    if (updates.rotation !== undefined) dbUpdates.rotation = updates.rotation;
+    if (updates.scale !== undefined) dbUpdates.scale = updates.scale;
+    if (updates.isVisible !== undefined) dbUpdates.is_visible = updates.isVisible;
+    
+    // Save to database
+    const { error } = await supabase
+      .from('map_tiles')
+      .update(dbUpdates)
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating tile:', error);
+    }
   }, [placedTiles]);
 
-  const handleTileDelete = useCallback((id: string) => {
+  const handleTileDelete = useCallback(async (id: string) => {
+    // Update local state immediately
     setPlacedTiles(placedTiles.filter(t => t.id !== id));
-  }, [placedTiles]);
+    if (selectedTileInstanceId === id) {
+      setSelectedTileInstanceId(null);
+    }
+    
+    // Delete from database
+    const { error } = await supabase
+      .from('map_tiles')
+      .delete()
+      .eq('id', id);
 
-  const handleTileDrop = useCallback((tileId: string, x: number, y: number) => {
+    if (error) {
+      console.error('Error deleting tile:', error);
+    }
+  }, [placedTiles, selectedTileInstanceId]);
+
+  const handleTileDrop = useCallback(async (tileId: string, x: number, y: number) => {
+    if (!activeMap || !user) return;
+    
     const tileDef = getTileById(tileId);
     if (!tileDef) return;
     
+    const id = crypto.randomUUID();
+    
+    // Save to database
+    const { error } = await supabase
+      .from('map_tiles')
+      .insert({
+        id,
+        map_id: activeMap.id,
+        user_id: user.id,
+        tile_id: tileId,
+        position_x: x,
+        position_y: y,
+        rotation: 0,
+        scale: 1,
+        is_visible: true,
+      });
+
+    if (error) {
+      console.error('Error placing tile:', error);
+      return;
+    }
+    
     const newTile: PlacedTile = {
-      id: crypto.randomUUID(),
-      tileId: tileId,
+      id,
+      tileId,
       x,
       y,
       rotation: 0,
@@ -838,10 +944,21 @@ export default function MapBuilder() {
     };
     setPlacedTiles(prev => [...prev, newTile]);
     setSelectedTileInstanceId(newTile.id);
-  }, []);
+  }, [activeMap, user]);
 
-  const handleTileMove = useCallback((id: string, x: number, y: number) => {
+  const handleTileMove = useCallback(async (id: string, x: number, y: number) => {
+    // Update local state immediately
     setPlacedTiles(placedTiles.map(t => t.id === id ? { ...t, x, y } : t));
+    
+    // Save to database
+    const { error } = await supabase
+      .from('map_tiles')
+      .update({ position_x: x, position_y: y })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error moving tile:', error);
+    }
   }, [placedTiles]);
 
   // Handle map import
