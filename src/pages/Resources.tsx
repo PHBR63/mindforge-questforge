@@ -216,6 +216,40 @@ export default function Resources() {
     }
   };
 
+  const handleCreateMultipleResources = async (files: Array<{
+    name: string;
+    description: string;
+    type: string;
+    file_url: string;
+    thumbnail_url?: string;
+    tags: string;
+  }>) => {
+    if (!user || files.length === 0) return;
+    
+    const resourcesToInsert = files.map(data => ({
+      name: data.name,
+      description: data.description || null,
+      type: data.type,
+      file_url: data.file_url || null,
+      thumbnail_url: data.thumbnail_url || null,
+      tags: data.tags ? data.tags.split(',').map(t => t.trim()) : null,
+      folder_id: currentFolderId,
+      user_id: user.id,
+      campaign_id: activeCampaign?.id || null,
+      is_global: !activeCampaign,
+    }));
+    
+    const { error } = await supabase.from('resources').insert(resourcesToInsert);
+    
+    if (error) {
+      toast({ variant: 'destructive', title: 'Erro', description: error.message });
+    } else {
+      toast({ title: `${files.length} recursos adicionados!` });
+      setIsAddDialogOpen(false);
+      loadData();
+    }
+  };
+
   const handleToggleFavorite = async (id: string, isFavorite: boolean) => {
     const { error } = await supabase.from('resources').update({ is_favorite: isFavorite }).eq('id', id);
     if (error) {
@@ -377,6 +411,7 @@ export default function Resources() {
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
         onSubmit={handleCreateResource}
+        onSubmitMultiple={handleCreateMultipleResources}
       />
       
       <MoveToFolderDialog
