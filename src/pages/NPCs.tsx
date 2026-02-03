@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { ImageUpload } from '@/components/ui/image-upload';
 import { Plus, Users, Search, AlertCircle, MoreVertical, Trash2, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -56,6 +57,7 @@ export default function NPCs() {
   const [npcs, setNpcs] = useState<NPC[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingNpc, setEditingNpc] = useState<NPC | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     name: '',
@@ -67,6 +69,7 @@ export default function NPCs() {
     faction: '',
     status: 'alive',
     secrets: '',
+    image_url: null as string | null,
   });
 
   useEffect(() => {
@@ -94,25 +97,64 @@ export default function NPCs() {
     setIsLoading(false);
   };
 
-  const handleCreate = async () => {
+  const resetForm = () => {
+    setFormData({
+      name: '', description: '', personality: '', motivation: '',
+      appearance: '', location: '', faction: '', status: 'alive', secrets: '',
+      image_url: null,
+    });
+    setEditingNpc(null);
+  };
+
+  const openEditDialog = (npc: NPC) => {
+    setEditingNpc(npc);
+    setFormData({
+      name: npc.name,
+      description: npc.description || '',
+      personality: npc.personality || '',
+      motivation: npc.motivation || '',
+      appearance: npc.appearance || '',
+      location: npc.location || '',
+      faction: npc.faction || '',
+      status: npc.status || 'alive',
+      secrets: npc.secrets || '',
+      image_url: npc.image_url,
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleSubmit = async () => {
     if (!formData.name.trim() || !activeCampaign || !user) return;
 
-    const { error } = await supabase.from('npcs').insert({
-      ...formData,
-      campaign_id: activeCampaign.id,
-      user_id: user.id,
-    });
+    if (editingNpc) {
+      const { error } = await supabase
+        .from('npcs')
+        .update(formData)
+        .eq('id', editingNpc.id);
 
-    if (error) {
-      toast({ variant: 'destructive', title: 'Erro', description: error.message });
+      if (error) {
+        toast({ variant: 'destructive', title: 'Erro', description: error.message });
+      } else {
+        toast({ title: 'NPC atualizado!', description: `${formData.name} foi salvo.` });
+        resetForm();
+        setIsDialogOpen(false);
+        loadNPCs();
+      }
     } else {
-      toast({ title: 'NPC criado!', description: `${formData.name} foi adicionado.` });
-      setFormData({
-        name: '', description: '', personality: '', motivation: '',
-        appearance: '', location: '', faction: '', status: 'alive', secrets: '',
+      const { error } = await supabase.from('npcs').insert({
+        ...formData,
+        campaign_id: activeCampaign.id,
+        user_id: user.id,
       });
-      setIsDialogOpen(false);
-      loadNPCs();
+
+      if (error) {
+        toast({ variant: 'destructive', title: 'Erro', description: error.message });
+      } else {
+        toast({ title: 'NPC criado!', description: `${formData.name} foi adicionado.` });
+        resetForm();
+        setIsDialogOpen(false);
+        loadNPCs();
+      }
     }
   };
 
@@ -167,19 +209,38 @@ export default function NPCs() {
               className="pl-9 w-64"
             />
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <Button onClick={() => setIsDialogOpen(true)} className="glow-gold">
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) resetForm();
+          }}>
+            <Button onClick={() => {
+              resetForm();
+              setIsDialogOpen(true);
+            }} className="glow-gold">
               <Plus className="w-4 h-4 mr-2" />
               Novo NPC
             </Button>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle className="font-display">Criar NPC</DialogTitle>
+                <DialogTitle className="font-display">
+                  {editingNpc ? 'Editar NPC' : 'Criar NPC'}
+                </DialogTitle>
                 <DialogDescription>
-                  Adicione um novo personagem à sua campanha
+                  {editingNpc ? 'Atualize as informações do personagem' : 'Adicione um novo personagem à sua campanha'}
                 </DialogDescription>
               </DialogHeader>
               <div className="grid grid-cols-2 gap-4 py-4">
+                {/* Image Upload */}
+                <div className="col-span-2">
+                  <ImageUpload
+                    value={formData.image_url}
+                    onChange={(url) => setFormData({ ...formData, image_url: url })}
+                    label="Imagem do NPC"
+                    placeholder="Arraste uma imagem ou clique para selecionar"
+                    aspectRatio="landscape"
+                    resourceType="npc"
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label>Nome *</Label>
                   <Input
@@ -264,8 +325,13 @@ export default function NPCs() {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-                <Button onClick={handleCreate}>Criar NPC</Button>
+                <Button variant="outline" onClick={() => {
+                  setIsDialogOpen(false);
+                  resetForm();
+                }}>Cancelar</Button>
+                <Button onClick={handleSubmit}>
+                  {editingNpc ? 'Salvar' : 'Criar NPC'}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -310,7 +376,16 @@ export default function NPCs() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
             >
-              <Card className="h-full hover:border-primary/50 transition-all">
+              <Card className="h-full hover:border-primary/50 transition-all overflow-hidden">
+                {npc.image_url && (
+                  <div className="h-32 overflow-hidden">
+                    <img 
+                      src={npc.image_url} 
+                      alt={npc.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
                 <CardHeader className="flex flex-row items-start justify-between">
                   <div>
                     <CardTitle className="font-display text-lg">{npc.name}</CardTitle>
@@ -331,7 +406,7 @@ export default function NPCs() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => openEditDialog(npc)}>
                           <Edit className="w-4 h-4 mr-2" />Editar
                         </DropdownMenuItem>
                         <DropdownMenuItem
