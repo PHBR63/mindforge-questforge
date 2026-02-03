@@ -52,7 +52,7 @@ export function AppSidebar() {
             <Scroll className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h1 className="font-display text-lg font-bold text-gold">RPG Master</h1>
+            <h1 className="font-display text-lg font-bold text-gold">BrainPG</h1>
             <p className="text-xs text-muted-foreground">Gestão de Campanhas</p>
           </div>
         </Link>
