@@ -1,5 +1,6 @@
 export { OnlineAssetBrowser } from './OnlineAssetBrowser';
 export { VTTMapGallery } from './VTTMapGallery';
+export { ForgottenAdventuresGallery } from './ForgottenAdventuresGallery';
 export {
   CURATED_ASSET_PACKS,
   ASSET_SOURCES,

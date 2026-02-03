@@ -38,7 +38,7 @@ import { MapDrawing, MapLayer, DrawingState, DrawingTool, DEFAULT_LAYERS } from 
 import { WallEditor } from '@/components/maps/WallEditor';
 import { Model3DLibrary } from '@/components/maps/Model3DLibrary';
 import { Map3DModel } from '@/components/maps/model3DTypes';
-import { OnlineAssetBrowser, VTTMapGallery } from '@/components/maps/onlineAssets';
+import { OnlineAssetBrowser, VTTMapGallery, ForgottenAdventuresGallery } from '@/components/maps/onlineAssets';
 import { TilesetLibrary, type PlacedTile, type TileDefinition, getTileById } from '@/components/maps/tilesets';
 import { type UVTTImportResult } from '@/components/maps/importExport';
 import { Plus, Map, AlertCircle, Trash2, Grid3X3, Box, Sun, Moon, Flame, Package, Paintbrush, Layers, Columns, Boxes, LayoutGrid } from 'lucide-react';
@@ -1074,6 +1074,7 @@ export default function MapBuilder() {
                   />
                   <MapImport onImport={handleMapImport} />
                   <OnlineAssetBrowser />
+                  <ForgottenAdventuresGallery />
                   <VTTMapGallery onImportMap={handleVTTMapImport} />
                 </>
               )}
