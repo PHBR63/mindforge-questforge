@@ -14,6 +14,9 @@ import Campaigns from "./pages/Campaigns";
 import MindMap from "./pages/MindMap";
 import NPCs from "./pages/NPCs";
 import Locations from "./pages/Locations";
+import Factions from "./pages/Factions";
+import Quests from "./pages/Quests";
+import Sessions from "./pages/Sessions";
 import Timeline from "./pages/Timeline";
 import Resources from "./pages/Resources";
 import NotFound from "./pages/NotFound";
@@ -104,7 +107,7 @@ function AppRoutes() {
         path="/factions"
         element={
           <ProtectedRoute>
-            <Dashboard />
+            <Factions />
           </ProtectedRoute>
         }
       />
@@ -112,7 +115,7 @@ function AppRoutes() {
         path="/quests"
         element={
           <ProtectedRoute>
-            <Dashboard />
+            <Quests />
           </ProtectedRoute>
         }
       />
@@ -120,7 +123,7 @@ function AppRoutes() {
         path="/sessions"
         element={
           <ProtectedRoute>
-            <Dashboard />
+            <Sessions />
           </ProtectedRoute>
         }
       />
