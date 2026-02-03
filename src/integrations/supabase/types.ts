@@ -389,6 +389,109 @@ export type Database = {
           },
         ]
       }
+      map_drawings: {
+        Row: {
+          brush_size: number | null
+          color: string
+          created_at: string
+          id: string
+          is_visible: boolean | null
+          layer: number | null
+          map_id: string
+          opacity: number | null
+          points: Json
+          tool_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brush_size?: number | null
+          color?: string
+          created_at?: string
+          id?: string
+          is_visible?: boolean | null
+          layer?: number | null
+          map_id: string
+          opacity?: number | null
+          points?: Json
+          tool_type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brush_size?: number | null
+          color?: string
+          created_at?: string
+          id?: string
+          is_visible?: boolean | null
+          layer?: number | null
+          map_id?: string
+          opacity?: number | null
+          points?: Json
+          tool_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "map_drawings_map_id_fkey"
+            columns: ["map_id"]
+            isOneToOne: false
+            referencedRelation: "maps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      map_layers: {
+        Row: {
+          created_at: string
+          id: string
+          is_locked: boolean | null
+          is_visible: boolean | null
+          layer_order: number | null
+          layer_type: string
+          map_id: string
+          name: string
+          opacity: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_locked?: boolean | null
+          is_visible?: boolean | null
+          layer_order?: number | null
+          layer_type?: string
+          map_id: string
+          name: string
+          opacity?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_locked?: boolean | null
+          is_visible?: boolean | null
+          layer_order?: number | null
+          layer_type?: string
+          map_id?: string
+          name?: string
+          opacity?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "map_layers_map_id_fkey"
+            columns: ["map_id"]
+            isOneToOne: false
+            referencedRelation: "maps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       map_tokens: {
         Row: {
           color: string | null
