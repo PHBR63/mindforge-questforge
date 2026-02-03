@@ -23,6 +23,7 @@ interface DrawableMapGridProps {
   onAssetSelect?: (assetId: string | null) => void;
   onAssetMove?: (assetId: string, x: number, y: number) => void;
   onModel3DSelect?: (modelId: string | null) => void;
+  onModel3DMove?: (modelId: string, x: number, y: number) => void;
   onCellClick: (x: number, y: number) => void;
   onAssetDrop?: (assetKey: string, category: string, x: number, y: number) => void;
   onDrawingComplete?: (drawing: Omit<MapDrawing, 'id' | 'map_id' | 'user_id' | 'created_at' | 'updated_at'>) => void;
@@ -52,6 +53,7 @@ export const DrawableMapGrid = forwardRef<DrawableMapGridRef, DrawableMapGridPro
   onAssetSelect,
   onAssetMove,
   onModel3DSelect,
+  onModel3DMove,
   onCellClick,
   onAssetDrop,
   onDrawingComplete,
@@ -576,6 +578,7 @@ export const DrawableMapGrid = forwardRef<DrawableMapGridRef, DrawableMapGridPro
               onAssetSelect?.(null);
             }
           }}
+          onModelMove={onModel3DMove}
           onSwitchTo3D={onSwitchTo3D}
         />
       </div>
