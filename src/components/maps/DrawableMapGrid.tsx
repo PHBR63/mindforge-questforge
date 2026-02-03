@@ -2,6 +2,8 @@ import { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHand
 import { MapToken, TokenDragState } from './types';
 import { MapAsset, getAssetByKey } from './assetTypes';
 import { MapDrawing, DrawingState, DrawingTool, DrawingPoint } from './drawingTypes';
+import { Map3DModel } from './model3DTypes';
+import { Model3DOverlay } from './Model3DPlaceholder';
 
 interface DrawableMapGridProps {
   gridWidth: number;
@@ -13,15 +15,19 @@ interface DrawableMapGridProps {
   drawings?: MapDrawing[];
   selectedTokenId: string | null;
   selectedAssetId?: string | null;
+  models3D?: Map3DModel[];
+  selectedModel3DId?: string | null;
   drawingState: DrawingState;
   onTokenMove: (tokenId: string, x: number, y: number) => void;
   onTokenSelect: (tokenId: string | null) => void;
   onAssetSelect?: (assetId: string | null) => void;
   onAssetMove?: (assetId: string, x: number, y: number) => void;
+  onModel3DSelect?: (modelId: string | null) => void;
   onCellClick: (x: number, y: number) => void;
   onAssetDrop?: (assetKey: string, category: string, x: number, y: number) => void;
   onDrawingComplete?: (drawing: Omit<MapDrawing, 'id' | 'map_id' | 'user_id' | 'created_at' | 'updated_at'>) => void;
   onFloodFill?: (x: number, y: number, color: string) => void;
+  onSwitchTo3D?: () => void;
 }
 
 export interface DrawableMapGridRef {
@@ -38,15 +44,19 @@ export const DrawableMapGrid = forwardRef<DrawableMapGridRef, DrawableMapGridPro
   drawings = [],
   selectedTokenId,
   selectedAssetId,
+  models3D = [],
+  selectedModel3DId,
   drawingState,
   onTokenMove,
   onTokenSelect,
   onAssetSelect,
   onAssetMove,
+  onModel3DSelect,
   onCellClick,
   onAssetDrop,
   onDrawingComplete,
   onFloodFill,
+  onSwitchTo3D,
 }, ref) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawingCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -552,6 +562,21 @@ export const DrawableMapGrid = forwardRef<DrawableMapGridRef, DrawableMapGridPro
           width={width}
           height={height}
           className="block absolute top-0 left-0 pointer-events-none"
+        />
+        
+        {/* 3D Model placeholders overlay */}
+        <Model3DOverlay
+          models={models3D}
+          cellSize={cellSize}
+          selectedModelId={selectedModel3DId || null}
+          onModelSelect={(id) => {
+            onModel3DSelect?.(id);
+            if (id) {
+              onTokenSelect(null);
+              onAssetSelect?.(null);
+            }
+          }}
+          onSwitchTo3D={onSwitchTo3D}
         />
       </div>
     </div>
