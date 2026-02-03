@@ -31,6 +31,7 @@ import { DrawableMapGrid, DrawableMapGridRef } from '@/components/maps/DrawableM
 import { DrawingToolbar } from '@/components/maps/DrawingToolbar';
 import { LayerPanel } from '@/components/maps/LayerPanel';
 import { MapExport } from '@/components/maps/MapExport';
+import { MapImport } from '@/components/maps/MapImport';
 import { MapData, MapToken } from '@/components/maps/types';
 import { MapAsset } from '@/components/maps/assetTypes';
 import { MapDrawing, MapLayer, DrawingState, DrawingTool, DEFAULT_LAYERS } from '@/components/maps/drawingTypes';
@@ -775,6 +776,106 @@ export default function MapBuilder() {
     });
   };
 
+  // Handle map import
+  const handleMapImport = async (data: {
+    mapData: {
+      name: string;
+      gridWidth: number;
+      gridHeight: number;
+      cellSize: number;
+      backgroundColor: string;
+      backgroundImageUrl?: string;
+    };
+    tokens: Partial<MapToken>[];
+    assets: Partial<MapAsset>[];
+    drawings: Partial<MapDrawing>[];
+    walls?: any[];
+    portals?: any[];
+    lights?: any[];
+  }) => {
+    if (!activeCampaign || !user) return;
+
+    // Create new map with imported data
+    const { data: newMapData, error: mapError } = await supabase
+      .from('maps')
+      .insert({
+        campaign_id: activeCampaign.id,
+        user_id: user.id,
+        name: data.mapData.name,
+        grid_width: data.mapData.gridWidth,
+        grid_height: data.mapData.gridHeight,
+        cell_size: data.mapData.cellSize,
+        background_color: data.mapData.backgroundColor,
+        background_image_url: data.mapData.backgroundImageUrl || null,
+      })
+      .select()
+      .single();
+
+    if (mapError) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao importar mapa',
+        description: mapError.message,
+      });
+      return;
+    }
+
+    const newMap = newMapData as MapData;
+
+    // Create default layers
+    const defaultLayers = DEFAULT_LAYERS.map((l) => ({
+      map_id: newMap.id,
+      user_id: user.id,
+      name: l.name,
+      layer_type: l.layer_type,
+      layer_order: l.layer_order,
+    }));
+    await supabase.from('map_layers').insert(defaultLayers);
+
+    // Import tokens
+    if (data.tokens.length > 0) {
+      const tokensToInsert = data.tokens.map((t) => ({
+        map_id: newMap.id,
+        user_id: user.id,
+        name: t.name || 'Imported Token',
+        token_type: t.token_type || 'marker',
+        color: t.color || '#8b5cf6',
+        size: t.size || 1,
+        position_x: t.position_x || 0,
+        position_y: t.position_y || 0,
+        layer: t.layer || 3,
+        is_visible: t.is_visible !== false,
+        notes: t.notes || null,
+      }));
+      await supabase.from('map_tokens').insert(tokensToInsert);
+    }
+
+    // Import drawings
+    if (data.drawings.length > 0) {
+      const drawingsToInsert = data.drawings.map((d) => ({
+        map_id: newMap.id,
+        user_id: user.id,
+        tool_type: d.tool_type || 'brush',
+        color: d.color || '#ffffff',
+        brush_size: d.brush_size || 5,
+        opacity: d.opacity || 1,
+        points: JSON.stringify(d.points || []),
+        layer: d.layer || 1,
+        is_visible: d.is_visible !== false,
+      }));
+      await supabase.from('map_drawings').insert(drawingsToInsert);
+    }
+
+    // Update state
+    setMaps([newMap, ...maps]);
+    setActiveMap(newMap);
+
+    toast({
+      title: 'Mapa importado!',
+      description: `${data.mapData.name} foi importado com sucesso.`,
+    });
+  };
+
   if (!activeCampaign) {
     return (
       <AppLayout title="Construtor de Mapas">
@@ -847,14 +948,17 @@ export default function MapBuilder() {
                 onMapUpdate={handleMapUpdate}
               />
               {activeMap && (
-                <MapExport
-                  map={activeMap}
-                  tokens={tokens}
-                  assets={assets}
-                  drawings={drawings}
-                  layers={layers}
-                  canvasRef={{ current: mapGridRef.current?.getCanvas() || null }}
-                />
+                <>
+                  <MapExport
+                    map={activeMap}
+                    tokens={tokens}
+                    assets={assets}
+                    drawings={drawings}
+                    layers={layers}
+                    canvasRef={{ current: mapGridRef.current?.getCanvas() || null }}
+                  />
+                  <MapImport onImport={handleMapImport} />
+                </>
               )}
             </div>
             
