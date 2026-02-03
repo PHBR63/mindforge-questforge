@@ -974,6 +974,7 @@ export default function MapBuilder() {
     tokens: Partial<MapToken>[];
     assets: Partial<MapAsset>[];
     drawings: Partial<MapDrawing>[];
+    tiles?: Partial<PlacedTile>[];
     walls?: any[];
     portals?: any[];
     lights?: any[];
@@ -1049,6 +1050,21 @@ export default function MapBuilder() {
         is_visible: d.is_visible !== false,
       }));
       await supabase.from('map_drawings').insert(drawingsToInsert);
+    }
+
+    // Import tiles
+    if (data.tiles && data.tiles.length > 0) {
+      const tilesToInsert = data.tiles.map((t) => ({
+        map_id: newMap.id,
+        user_id: user.id,
+        tile_id: t.tileId || '',
+        position_x: t.x || 0,
+        position_y: t.y || 0,
+        rotation: t.rotation || 0,
+        scale: t.scale || 1,
+        is_visible: t.isVisible !== false,
+      }));
+      await supabase.from('map_tiles').insert(tilesToInsert);
     }
 
     // Update state
@@ -1196,6 +1212,7 @@ export default function MapBuilder() {
                     assets={assets}
                     drawings={drawings}
                     layers={layers}
+                    tiles={placedTiles}
                     canvasRef={{ current: mapGridRef.current?.getCanvas() || null }}
                   />
                   <MapImport onImport={handleMapImport} />
