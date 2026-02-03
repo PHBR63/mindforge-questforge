@@ -257,6 +257,32 @@ export default function Resources() {
     setIsMoveDialogOpen(true);
   };
 
+  const handleFilesDropped = async (files: Array<{ name: string; type: string; url: string }>) => {
+    if (!user) return;
+
+    for (const file of files) {
+      const { error } = await supabase.from('resources').insert({
+        name: file.name,
+        type: file.type,
+        file_url: file.url,
+        thumbnail_url: file.url,
+        folder_id: currentFolderId,
+        user_id: user.id,
+        campaign_id: activeCampaign?.id || null,
+        is_global: !activeCampaign,
+      });
+
+      if (error) {
+        toast({ variant: 'destructive', title: 'Erro', description: error.message });
+      }
+    }
+
+    if (files.length > 0) {
+      toast({ title: `${files.length} arquivo(s) adicionado(s)!` });
+      loadData();
+    }
+  };
+
   return (
     <AppLayout
       title="Biblioteca de Recursos"
@@ -331,6 +357,7 @@ export default function Resources() {
               onDelete={handleDeleteResource}
               onMoveToFolder={openMoveDialog}
               isLoading={isLoading}
+              onFilesDropped={handleFilesDropped}
             />
           </div>
         </div>
