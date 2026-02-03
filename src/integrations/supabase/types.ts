@@ -327,6 +327,68 @@ export type Database = {
           },
         ]
       }
+      map_assets: {
+        Row: {
+          asset_key: string
+          asset_type: string
+          created_at: string
+          custom_image_url: string | null
+          id: string
+          is_visible: boolean | null
+          layer: number | null
+          map_id: string
+          name: string | null
+          position_x: number
+          position_y: number
+          rotation: number | null
+          scale: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asset_key: string
+          asset_type?: string
+          created_at?: string
+          custom_image_url?: string | null
+          id?: string
+          is_visible?: boolean | null
+          layer?: number | null
+          map_id: string
+          name?: string | null
+          position_x?: number
+          position_y?: number
+          rotation?: number | null
+          scale?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          asset_key?: string
+          asset_type?: string
+          created_at?: string
+          custom_image_url?: string | null
+          id?: string
+          is_visible?: boolean | null
+          layer?: number | null
+          map_id?: string
+          name?: string | null
+          position_x?: number
+          position_y?: number
+          rotation?: number | null
+          scale?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "map_assets_map_id_fkey"
+            columns: ["map_id"]
+            isOneToOne: false
+            referencedRelation: "maps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       map_tokens: {
         Row: {
           color: string | null

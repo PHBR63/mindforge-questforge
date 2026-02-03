@@ -27,12 +27,15 @@ import { MapGrid } from '@/components/maps/MapGrid';
 import { MapScene3D } from '@/components/maps/MapScene3D';
 import { TokenPanel } from '@/components/maps/TokenPanel';
 import { MapToolbar } from '@/components/maps/MapToolbar';
+import { AssetLibrary } from '@/components/maps/AssetLibrary';
 import { MapData, MapToken } from '@/components/maps/types';
-import { Plus, Map, AlertCircle, Trash2, Grid3X3, Box, Sun, Moon, Flame } from 'lucide-react';
+import { MapAsset } from '@/components/maps/assetTypes';
+import { Plus, Map, AlertCircle, Trash2, Grid3X3, Box, Sun, Moon, Flame, Package } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 type ViewMode = '2d' | '3d';
 type Environment3D = 'day' | 'night' | 'dungeon';
+type PanelMode = 'tokens' | 'assets';
 
 export default function MapBuilder() {
   const { activeCampaign } = useCampaignContext();
@@ -42,13 +45,16 @@ export default function MapBuilder() {
   const [maps, setMaps] = useState<MapData[]>([]);
   const [activeMap, setActiveMap] = useState<MapData | null>(null);
   const [tokens, setTokens] = useState<MapToken[]>([]);
+  const [assets, setAssets] = useState<MapAsset[]>([]);
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newMapName, setNewMapName] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('2d');
   const [environment3D, setEnvironment3D] = useState<Environment3D>('dungeon');
+  const [panelMode, setPanelMode] = useState<PanelMode>('tokens');
 
   // Load maps
   useEffect(() => {
@@ -80,32 +86,50 @@ export default function MapBuilder() {
     loadMaps();
   }, [activeCampaign, toast]);
 
-  // Load tokens when map changes
+  // Load tokens and assets when map changes
   useEffect(() => {
     if (!activeMap) {
       setTokens([]);
+      setAssets([]);
       return;
     }
 
-    const loadTokens = async () => {
-      const { data, error } = await supabase
-        .from('map_tokens')
-        .select('*')
-        .eq('map_id', activeMap.id)
-        .order('layer', { ascending: true });
+    const loadMapData = async () => {
+      const [tokensResult, assetsResult] = await Promise.all([
+        supabase
+          .from('map_tokens')
+          .select('*')
+          .eq('map_id', activeMap.id)
+          .order('layer', { ascending: true }),
+        supabase
+          .from('map_assets')
+          .select('*')
+          .eq('map_id', activeMap.id)
+          .order('layer', { ascending: true }),
+      ]);
 
-      if (error) {
+      if (tokensResult.error) {
         toast({
           variant: 'destructive',
           title: 'Erro ao carregar tokens',
-          description: error.message,
+          description: tokensResult.error.message,
         });
       } else {
-        setTokens(data as MapToken[]);
+        setTokens(tokensResult.data as MapToken[]);
+      }
+
+      if (assetsResult.error) {
+        toast({
+          variant: 'destructive',
+          title: 'Erro ao carregar assets',
+          description: assetsResult.error.message,
+        });
+      } else {
+        setAssets(assetsResult.data as MapAsset[]);
       }
     };
 
-    loadTokens();
+    loadMapData();
   }, [activeMap, toast]);
 
   const handleCreateMap = async () => {
@@ -289,6 +313,79 @@ export default function MapBuilder() {
     setTokens(tokens.filter((t) => t.id !== tokenId));
   };
 
+  // Asset handlers
+  const handleAssetPlace = async (assetKey: string, category: string, x?: number, y?: number) => {
+    if (!activeMap || !user) return;
+
+    const { data, error } = await supabase
+      .from('map_assets')
+      .insert({
+        map_id: activeMap.id,
+        user_id: user.id,
+        asset_type: category,
+        asset_key: assetKey,
+        position_x: x ?? Math.random() * (activeMap.grid_width - 1),
+        position_y: y ?? Math.random() * (activeMap.grid_height - 1),
+      })
+      .select()
+      .single();
+
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao adicionar asset',
+        description: error.message,
+      });
+      return;
+    }
+
+    setAssets([...assets, data as MapAsset]);
+  };
+
+  const handleAssetMove = async (assetId: string, x: number, y: number) => {
+    setAssets(assets.map((a) => (a.id === assetId ? { ...a, position_x: x, position_y: y } : a)));
+
+    await supabase
+      .from('map_assets')
+      .update({ position_x: x, position_y: y })
+      .eq('id', assetId);
+  };
+
+  const handleAssetUpdate = async (assetId: string, updates: Partial<MapAsset>) => {
+    setAssets(assets.map((a) => (a.id === assetId ? { ...a, ...updates } : a)));
+
+    const { error } = await supabase
+      .from('map_assets')
+      .update(updates)
+      .eq('id', assetId);
+
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao atualizar asset',
+        description: error.message,
+      });
+    }
+  };
+
+  const handleAssetDelete = async (assetId: string) => {
+    const { error } = await supabase
+      .from('map_assets')
+      .delete()
+      .eq('id', assetId);
+
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao excluir asset',
+        description: error.message,
+      });
+      return;
+    }
+
+    setAssets(assets.filter((a) => a.id !== assetId));
+  };
+
   if (!activeCampaign) {
     return (
       <AppLayout title="Construtor de Mapas">
@@ -391,6 +488,19 @@ export default function MapBuilder() {
                 </div>
               )}
               
+              {/* Panel mode toggle */}
+              <Tabs value={panelMode} onValueChange={(v) => setPanelMode(v as PanelMode)}>
+                <TabsList>
+                  <TabsTrigger value="tokens" className="gap-2 text-xs">
+                    Tokens
+                  </TabsTrigger>
+                  <TabsTrigger value="assets" className="gap-2 text-xs">
+                    <Package className="w-3 h-3" />
+                    Assets
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+              
               {/* 2D/3D Toggle */}
               <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
                 <TabsList>
@@ -407,7 +517,7 @@ export default function MapBuilder() {
             </div>
           </div>
 
-          <div className="flex gap-4">
+          <div className="flex gap-0">
             <div className="flex-1" style={{ height: 'calc(100vh - 20rem)' }}>
               {viewMode === '2d' ? (
                 <MapGrid
@@ -416,10 +526,21 @@ export default function MapBuilder() {
                   cellSize={activeMap.cell_size}
                   backgroundColor={activeMap.background_color || '#1a1a2e'}
                   tokens={tokens}
+                  assets={assets}
                   selectedTokenId={selectedTokenId}
+                  selectedAssetId={selectedAssetId}
                   onTokenMove={handleTokenMove}
-                  onTokenSelect={setSelectedTokenId}
+                  onTokenSelect={(id) => {
+                    setSelectedTokenId(id);
+                    if (id) setSelectedAssetId(null);
+                  }}
+                  onAssetSelect={(id) => {
+                    setSelectedAssetId(id);
+                    if (id) setSelectedTokenId(null);
+                  }}
+                  onAssetMove={handleAssetMove}
                   onCellClick={(x, y) => console.log('Cell clicked:', x, y)}
+                  onAssetDrop={handleAssetPlace}
                 />
               ) : (
                 <MapScene3D
@@ -435,14 +556,25 @@ export default function MapBuilder() {
               )}
             </div>
 
-            <TokenPanel
-              tokens={tokens}
-              selectedTokenId={selectedTokenId}
-              onTokenSelect={setSelectedTokenId}
-              onTokenCreate={handleTokenCreate}
-              onTokenUpdate={handleTokenUpdate}
-              onTokenDelete={handleTokenDelete}
-            />
+            {panelMode === 'tokens' ? (
+              <TokenPanel
+                tokens={tokens}
+                selectedTokenId={selectedTokenId}
+                onTokenSelect={setSelectedTokenId}
+                onTokenCreate={handleTokenCreate}
+                onTokenUpdate={handleTokenUpdate}
+                onTokenDelete={handleTokenDelete}
+              />
+            ) : (
+              <AssetLibrary
+                assets={assets}
+                selectedAssetId={selectedAssetId}
+                onAssetSelect={setSelectedAssetId}
+                onAssetPlace={(key, cat) => handleAssetPlace(key, cat)}
+                onAssetUpdate={handleAssetUpdate}
+                onAssetDelete={handleAssetDelete}
+              />
+            )}
           </div>
 
           <div className="flex justify-end">

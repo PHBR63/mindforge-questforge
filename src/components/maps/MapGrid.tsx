@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { MapToken, TokenDragState } from './types';
+import { MapAsset, getAssetByKey } from './assetTypes';
 
 interface MapGridProps {
   gridWidth: number;
@@ -7,10 +8,15 @@ interface MapGridProps {
   cellSize: number;
   backgroundColor: string;
   tokens: MapToken[];
+  assets?: MapAsset[];
   selectedTokenId: string | null;
+  selectedAssetId?: string | null;
   onTokenMove: (tokenId: string, x: number, y: number) => void;
   onTokenSelect: (tokenId: string | null) => void;
+  onAssetSelect?: (assetId: string | null) => void;
+  onAssetMove?: (assetId: string, x: number, y: number) => void;
   onCellClick: (x: number, y: number) => void;
+  onAssetDrop?: (assetKey: string, category: string, x: number, y: number) => void;
 }
 
 export function MapGrid({
@@ -19,10 +25,15 @@ export function MapGrid({
   cellSize,
   backgroundColor,
   tokens,
+  assets = [],
   selectedTokenId,
+  selectedAssetId,
   onTokenMove,
   onTokenSelect,
+  onAssetSelect,
+  onAssetMove,
   onCellClick,
+  onAssetDrop,
 }: MapGridProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -70,6 +81,41 @@ export function MapGrid({
       ctx.stroke();
     }
 
+    // Draw assets (sorted by layer)
+    const sortedAssets = [...assets].sort((a, b) => (a.layer || 0) - (b.layer || 0));
+    
+    for (const asset of sortedAssets) {
+      if (!asset.is_visible) continue;
+      
+      const assetDef = getAssetByKey(asset.asset_key);
+      if (!assetDef) continue;
+      
+      const assetSize = (assetDef.size || 1) * cellSize * (asset.scale || 1);
+      const x = asset.position_x * cellSize;
+      const y = asset.position_y * cellSize;
+      
+      ctx.save();
+      ctx.translate(x + assetSize / 2, y + assetSize / 2);
+      ctx.rotate((asset.rotation || 0) * Math.PI / 180);
+      
+      // Draw asset icon
+      ctx.font = `${assetSize * 0.7}px serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(assetDef.icon, 0, 0);
+      
+      // Selection indicator
+      if (selectedAssetId === asset.id) {
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(-assetSize / 2, -assetSize / 2, assetSize, assetSize);
+        ctx.setLineDash([]);
+      }
+      
+      ctx.restore();
+    }
+
     // Draw tokens
     const sortedTokens = [...tokens].sort((a, b) => (a.layer || 1) - (b.layer || 1));
     
@@ -113,7 +159,7 @@ export function MapGrid({
         y + tokenSize / 2
       );
     }
-  }, [gridWidth, gridHeight, cellSize, backgroundColor, tokens, selectedTokenId, width, height]);
+  }, [gridWidth, gridHeight, cellSize, backgroundColor, tokens, assets, selectedTokenId, selectedAssetId, width, height]);
 
   useEffect(() => {
     drawGrid();
@@ -141,6 +187,19 @@ export function MapGrid({
     });
   };
 
+  const getAssetAtPosition = (x: number, y: number): MapAsset | undefined => {
+    return assets.find((asset) => {
+      const assetDef = getAssetByKey(asset.asset_key);
+      const size = (assetDef?.size || 1) * (asset.scale || 1);
+      return (
+        x >= asset.position_x &&
+        x < asset.position_x + size &&
+        y >= asset.position_y &&
+        y < asset.position_y + size
+      );
+    });
+  };
+
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       // Middle mouse or Alt+Left click for panning
@@ -150,10 +209,12 @@ export function MapGrid({
     }
 
     const pos = getGridPosition(e.clientX, e.clientY);
+    
+    // Check for token first (tokens are on top)
     const token = getTokenAtPosition(pos.x, pos.y);
-
     if (token) {
       onTokenSelect(token.id);
+      onAssetSelect?.(null);
       setDragState({
         isDragging: true,
         tokenId: token.id,
@@ -162,10 +223,21 @@ export function MapGrid({
         offsetX: pos.x - token.position_x,
         offsetY: pos.y - token.position_y,
       });
-    } else {
-      onTokenSelect(null);
-      onCellClick(pos.x, pos.y);
+      return;
     }
+    
+    // Check for asset
+    const asset = getAssetAtPosition(pos.x, pos.y);
+    if (asset) {
+      onAssetSelect?.(asset.id);
+      onTokenSelect(null);
+      return;
+    }
+    
+    // Empty cell
+    onTokenSelect(null);
+    onAssetSelect?.(null);
+    onCellClick(pos.x, pos.y);
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -207,11 +279,30 @@ export function MapGrid({
     });
   };
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    try {
+      const data = JSON.parse(e.dataTransfer.getData('application/json'));
+      if (data.assetKey && onAssetDrop) {
+        const pos = getGridPosition(e.clientX, e.clientY);
+        onAssetDrop(data.assetKey, data.category, pos.x, pos.y);
+      }
+    } catch (err) {
+      // Invalid drop data
+    }
+  };
+
   return (
     <div
       ref={containerRef}
-      className="overflow-auto bg-background/50 rounded-lg border border-border"
-      style={{ maxHeight: 'calc(100vh - 16rem)' }}
+      className="overflow-auto bg-background/50 rounded-lg border border-border h-full"
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
       <div
         style={{
