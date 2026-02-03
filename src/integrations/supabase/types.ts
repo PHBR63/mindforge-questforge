@@ -175,6 +175,124 @@ export type Database = {
           },
         ]
       }
+      map_tokens: {
+        Row: {
+          color: string | null
+          created_at: string
+          id: string
+          image_url: string | null
+          is_visible: boolean | null
+          layer: number | null
+          map_id: string
+          name: string
+          notes: string | null
+          position_x: number
+          position_y: number
+          size: number | null
+          token_type: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          is_visible?: boolean | null
+          layer?: number | null
+          map_id: string
+          name: string
+          notes?: string | null
+          position_x?: number
+          position_y?: number
+          size?: number | null
+          token_type?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          is_visible?: boolean | null
+          layer?: number | null
+          map_id?: string
+          name?: string
+          notes?: string | null
+          position_x?: number
+          position_y?: number
+          size?: number | null
+          token_type?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "map_tokens_map_id_fkey"
+            columns: ["map_id"]
+            isOneToOne: false
+            referencedRelation: "maps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maps: {
+        Row: {
+          background_color: string | null
+          background_image_url: string | null
+          campaign_id: string
+          cell_size: number
+          created_at: string
+          description: string | null
+          grid_height: number
+          grid_width: number
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          background_color?: string | null
+          background_image_url?: string | null
+          campaign_id: string
+          cell_size?: number
+          created_at?: string
+          description?: string | null
+          grid_height?: number
+          grid_width?: number
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          background_color?: string | null
+          background_image_url?: string | null
+          campaign_id?: string
+          cell_size?: number
+          created_at?: string
+          description?: string | null
+          grid_height?: number
+          grid_width?: number
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maps_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mind_map_connections: {
         Row: {
           campaign_id: string
