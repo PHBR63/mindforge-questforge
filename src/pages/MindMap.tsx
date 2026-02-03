@@ -40,6 +40,7 @@ import {
   ConnectionDialog,
   EntityImportDialog,
   MindMapToolbar,
+  ExportDialog,
   NODE_TYPES,
   CONNECTION_TYPES,
   MindMapNodeData,
@@ -66,6 +67,7 @@ function MindMapContent() {
   const [isConnectionDialogOpen, setIsConnectionDialogOpen] = useState(false);
   const [isEntityDialogOpen, setIsEntityDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
 
   // Form states
   const [nodeTitle, setNodeTitle] = useState('');
@@ -594,10 +596,12 @@ function MindMapContent() {
           }}
           onSaveLayout={handleSavePositions}
           onImportEntities={() => setIsEntityDialogOpen(true)}
+          onExport={() => setIsExportDialogOpen(true)}
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
           onFitView={handleFitView}
           isSaving={isSaving}
+          hasNodes={nodes.length > 0}
         />
       }
     >
@@ -706,6 +710,21 @@ function MindMapContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Export Dialog */}
+      <ExportDialog
+        open={isExportDialogOpen}
+        onOpenChange={setIsExportDialogOpen}
+        campaignName={activeCampaign.name}
+        nodeDataMap={nodeDataMap}
+        connections={edges.map((e) => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          label: (e.data as any)?.label,
+          connectionType: (e.data as any)?.connectionType,
+        }))}
+      />
     </AppLayout>
   );
 }
