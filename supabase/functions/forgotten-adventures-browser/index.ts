@@ -2,24 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
-
-// Forgotten Adventures asset structure based on their public repository
-// They provide free assets through their FA Tokens repository and public packs
-const FA_SOURCES = {
-  tokens: {
-    baseUrl: 'https://api.github.com/repos/Forgotten-Adventures/FA-Token-Packs',
-    name: 'FA Token Packs'
-  },
-  battlemaps: {
-    baseUrl: 'https://api.github.com/repos/Forgotten-Adventures/battlemaps',
-    name: 'FA Battlemaps'
-  }
-};
-
-// Alternative: Use their direct CDN/website structure
-const FA_WEBSITE_BASE = 'https://www.forgotten-adventures.net';
 
 interface FAAsset {
   id: string;
@@ -27,6 +11,8 @@ interface FAAsset {
   type: 'token' | 'map' | 'asset';
   thumbnailUrl: string;
   downloadUrl: string;
+  // Direct image URLs for individual assets
+  directImageUrls?: string[];
   category: string;
   tags: string[];
 }
@@ -34,65 +20,93 @@ interface FAAsset {
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
     const url = new URL(req.url);
     const action = url.searchParams.get('action') || 'list';
     const category = url.searchParams.get('category') || 'tokens';
-    const path = url.searchParams.get('path') || '';
     const search = url.searchParams.get('search') || '';
 
-    console.log(`FA Browser action: ${action}, category: ${category}, path: ${path}`);
+    console.log(`FA Browser action: ${action}, category: ${category}`);
 
     if (action === 'list') {
-      // List available asset categories and packs
-      const assets = await listFAAssets(category, path);
+      const assets = await listFAAssets(category);
       return new Response(JSON.stringify(assets), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     if (action === 'search') {
-      // Search for specific assets
       const results = await searchFAAssets(search, category);
       return new Response(JSON.stringify(results), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    if (action === 'download') {
-      // Proxy download of an asset
-      const assetUrl = url.searchParams.get('url');
-      if (!assetUrl) {
-        throw new Error('Asset URL is required for download');
+    if (action === 'proxy-image') {
+      // Proxy image download to bypass CORS
+      const imageUrl = url.searchParams.get('url');
+      if (!imageUrl) {
+        throw new Error('Image URL is required');
       }
-      
-      const assetData = await downloadAsset(assetUrl);
-      return new Response(assetData.content, {
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': assetData.contentType,
-          'Content-Disposition': `attachment; filename="${assetData.filename}"`,
+
+      console.log(`Proxying image: ${imageUrl}`);
+
+      const response = await fetch(imageUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'image/*,*/*',
+          'Referer': 'https://www.forgotten-adventures.net/',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.status}`);
+      }
+
+      const contentType = response.headers.get('Content-Type') || 'image/png';
+      const arrayBuffer = await response.arrayBuffer();
+
+      return new Response(arrayBuffer, {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': contentType,
+          'Cache-Control': 'public, max-age=86400',
         },
       });
     }
 
-    if (action === 'preview') {
-      // Get preview/thumbnail for an asset
+    if (action === 'download') {
       const assetUrl = url.searchParams.get('url');
       if (!assetUrl) {
-        throw new Error('Asset URL is required for preview');
+        throw new Error('Asset URL is required for download');
       }
-      
-      const response = await fetch(assetUrl);
+
+      console.log(`Downloading asset: ${assetUrl}`);
+
+      const response = await fetch(assetUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Referer': 'https://www.forgotten-adventures.net/',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to download: ${response.status}`);
+      }
+
       const content = await response.arrayBuffer();
-      
+      const contentType = response.headers.get('Content-Type') || 'application/octet-stream';
+      const urlParts = assetUrl.split('/');
+      const filename = urlParts[urlParts.length - 1] || 'asset';
+
       return new Response(content, {
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': response.headers.get('Content-Type') || 'image/png',
+        headers: {
+          ...corsHeaders,
+          'Content-Type': contentType,
+          'Content-Disposition': `attachment; filename="${filename}"`,
         },
       });
     }
@@ -105,9 +119,9 @@ serve(async (req) => {
   } catch (error: unknown) {
     console.error('FA Browser error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       error: errorMessage,
-      details: 'Failed to fetch Forgotten Adventures assets'
+      details: 'Failed to process Forgotten Adventures request'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -115,14 +129,12 @@ serve(async (req) => {
   }
 });
 
-async function listFAAssets(category: string, path: string): Promise<any> {
-  // Use curated asset list since FA doesn't have a public API
-  // These are verified free assets from their website
+async function listFAAssets(category: string): Promise<{ category: string; assets: FAAsset[] }> {
   const curatedAssets = getCuratedFAAssets();
-  
+
   if (category === 'all') {
     return {
-      categories: Object.keys(curatedAssets),
+      category: 'all',
       assets: Object.values(curatedAssets).flat(),
     };
   }
@@ -130,43 +142,18 @@ async function listFAAssets(category: string, path: string): Promise<any> {
   return {
     category,
     assets: curatedAssets[category] || [],
-    subfolders: getSubfolders(category, path),
   };
 }
 
 async function searchFAAssets(query: string, category: string): Promise<FAAsset[]> {
   const allAssets = Object.values(getCuratedFAAssets()).flat();
   const queryLower = query.toLowerCase();
-  
-  return allAssets.filter(asset => 
+
+  return allAssets.filter(asset =>
     asset.name.toLowerCase().includes(queryLower) ||
     asset.tags.some(tag => tag.toLowerCase().includes(queryLower)) ||
     asset.category.toLowerCase().includes(queryLower)
   );
-}
-
-async function downloadAsset(assetUrl: string): Promise<{ content: ArrayBuffer; contentType: string; filename: string }> {
-  const response = await fetch(assetUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to download asset: ${response.status}`);
-  }
-  
-  const content = await response.arrayBuffer();
-  const contentType = response.headers.get('Content-Type') || 'application/octet-stream';
-  const urlParts = assetUrl.split('/');
-  const filename = urlParts[urlParts.length - 1] || 'asset';
-  
-  return { content, contentType, filename };
-}
-
-function getSubfolders(category: string, path: string): string[] {
-  const folderStructure: Record<string, string[]> = {
-    tokens: ['Heroes', 'Monsters', 'NPCs', 'Animals', 'Undead', 'Elementals'],
-    maps: ['Dungeons', 'Wilderness', 'Towns', 'Interiors', 'Ships', 'Caves'],
-    assets: ['Furniture', 'Vegetation', 'Props', 'Effects', 'Terrain', 'Walls'],
-  };
-  
-  return folderStructure[category] || [];
 }
 
 function getCuratedFAAssets(): Record<string, FAAsset[]> {
