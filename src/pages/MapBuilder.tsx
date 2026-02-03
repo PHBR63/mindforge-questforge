@@ -34,10 +34,11 @@ import { MapExport } from '@/components/maps/MapExport';
 import { MapData, MapToken } from '@/components/maps/types';
 import { MapAsset } from '@/components/maps/assetTypes';
 import { MapDrawing, MapLayer, DrawingState, DrawingTool, DEFAULT_LAYERS } from '@/components/maps/drawingTypes';
-import { Plus, Map, AlertCircle, Trash2, Grid3X3, Box, Sun, Moon, Flame, Package, Paintbrush, Layers } from 'lucide-react';
+import { WallEditor } from '@/components/maps/WallEditor';
+import { Plus, Map, AlertCircle, Trash2, Grid3X3, Box, Sun, Moon, Flame, Package, Paintbrush, Layers, Columns } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-type ViewMode = '2d' | '3d';
+type ViewMode = '2d' | '3d' | 'walls';
 type Environment3D = 'day' | 'night' | 'dungeon';
 type PanelMode = 'tokens' | 'assets' | 'layers';
 
@@ -739,7 +740,7 @@ export default function MapBuilder() {
                 </TabsList>
               </Tabs>
               
-              {/* 2D/3D Toggle */}
+              {/* 2D/3D/Walls Toggle */}
               <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
                 <TabsList>
                   <TabsTrigger value="2d" className="gap-2">
@@ -749,6 +750,10 @@ export default function MapBuilder() {
                   <TabsTrigger value="3d" className="gap-2">
                     <Box className="w-4 h-4" />
                     3D
+                  </TabsTrigger>
+                  <TabsTrigger value="walls" className="gap-2">
+                    <Columns className="w-4 h-4" />
+                    Paredes
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -771,83 +776,94 @@ export default function MapBuilder() {
             />
           )}
 
-          <div className="flex gap-0">
-            <div className="flex-1" style={{ height: 'calc(100vh - 22rem)' }}>
-              {viewMode === '2d' ? (
-                <DrawableMapGrid
-                  ref={mapGridRef}
-                  gridWidth={activeMap.grid_width}
-                  gridHeight={activeMap.grid_height}
-                  cellSize={activeMap.cell_size}
-                  backgroundColor={activeMap.background_color || '#1a1a2e'}
-                  tokens={tokens}
-                  assets={assets}
-                  drawings={drawings}
-                  selectedTokenId={selectedTokenId}
-                  selectedAssetId={selectedAssetId}
-                  drawingState={drawingState}
-                  onTokenMove={handleTokenMove}
-                  onTokenSelect={(id) => {
-                    setSelectedTokenId(id);
-                    if (id) setSelectedAssetId(null);
-                  }}
-                  onAssetSelect={(id) => {
-                    setSelectedAssetId(id);
-                    if (id) setSelectedTokenId(null);
-                  }}
-                  onAssetMove={handleAssetMove}
-                  onCellClick={(x, y) => console.log('Cell clicked:', x, y)}
-                  onAssetDrop={handleAssetPlace}
-                  onDrawingComplete={handleDrawingComplete}
-                />
-              ) : (
-                <MapScene3D
-                  gridWidth={activeMap.grid_width}
-                  gridHeight={activeMap.grid_height}
-                  cellSize={activeMap.cell_size / 10}
-                  backgroundColor={activeMap.background_color || '#1a1a2e'}
+          {viewMode === 'walls' ? (
+            <div style={{ height: 'calc(100vh - 18rem)' }}>
+              <WallEditor
+                mapId={activeMap.id}
+                gridWidth={activeMap.grid_width}
+                gridHeight={activeMap.grid_height}
+                cellSize={activeMap.cell_size}
+              />
+            </div>
+          ) : (
+            <div className="flex gap-0">
+              <div className="flex-1" style={{ height: 'calc(100vh - 22rem)' }}>
+                {viewMode === '2d' ? (
+                  <DrawableMapGrid
+                    ref={mapGridRef}
+                    gridWidth={activeMap.grid_width}
+                    gridHeight={activeMap.grid_height}
+                    cellSize={activeMap.cell_size}
+                    backgroundColor={activeMap.background_color || '#1a1a2e'}
+                    tokens={tokens}
+                    assets={assets}
+                    drawings={drawings}
+                    selectedTokenId={selectedTokenId}
+                    selectedAssetId={selectedAssetId}
+                    drawingState={drawingState}
+                    onTokenMove={handleTokenMove}
+                    onTokenSelect={(id) => {
+                      setSelectedTokenId(id);
+                      if (id) setSelectedAssetId(null);
+                    }}
+                    onAssetSelect={(id) => {
+                      setSelectedAssetId(id);
+                      if (id) setSelectedTokenId(null);
+                    }}
+                    onAssetMove={handleAssetMove}
+                    onCellClick={(x, y) => console.log('Cell clicked:', x, y)}
+                    onAssetDrop={handleAssetPlace}
+                    onDrawingComplete={handleDrawingComplete}
+                  />
+                ) : (
+                  <MapScene3D
+                    gridWidth={activeMap.grid_width}
+                    gridHeight={activeMap.grid_height}
+                    cellSize={activeMap.cell_size / 10}
+                    backgroundColor={activeMap.background_color || '#1a1a2e'}
+                    tokens={tokens}
+                    selectedTokenId={selectedTokenId}
+                    onTokenSelect={setSelectedTokenId}
+                    environment={environment3D}
+                  />
+                )}
+              </div>
+
+              {panelMode === 'tokens' && (
+                <TokenPanel
                   tokens={tokens}
                   selectedTokenId={selectedTokenId}
                   onTokenSelect={setSelectedTokenId}
-                  environment={environment3D}
+                  onTokenCreate={handleTokenCreate}
+                  onTokenUpdate={handleTokenUpdate}
+                  onTokenDelete={handleTokenDelete}
+                />
+              )}
+
+              {panelMode === 'assets' && (
+                <AssetLibrary
+                  assets={assets}
+                  selectedAssetId={selectedAssetId}
+                  onAssetSelect={setSelectedAssetId}
+                  onAssetPlace={(key, cat) => handleAssetPlace(key, cat)}
+                  onAssetUpdate={handleAssetUpdate}
+                  onAssetDelete={handleAssetDelete}
+                />
+              )}
+
+              {panelMode === 'layers' && (
+                <LayerPanel
+                  layers={layers}
+                  activeLayerId={drawingState.activeLayerId}
+                  onLayerSelect={(id) => setDrawingState({ ...drawingState, activeLayerId: id })}
+                  onLayerCreate={handleLayerCreate}
+                  onLayerUpdate={handleLayerUpdate}
+                  onLayerDelete={handleLayerDelete}
+                  onLayerReorder={handleLayerReorder}
                 />
               )}
             </div>
-
-            {panelMode === 'tokens' && (
-              <TokenPanel
-                tokens={tokens}
-                selectedTokenId={selectedTokenId}
-                onTokenSelect={setSelectedTokenId}
-                onTokenCreate={handleTokenCreate}
-                onTokenUpdate={handleTokenUpdate}
-                onTokenDelete={handleTokenDelete}
-              />
-            )}
-
-            {panelMode === 'assets' && (
-              <AssetLibrary
-                assets={assets}
-                selectedAssetId={selectedAssetId}
-                onAssetSelect={setSelectedAssetId}
-                onAssetPlace={(key, cat) => handleAssetPlace(key, cat)}
-                onAssetUpdate={handleAssetUpdate}
-                onAssetDelete={handleAssetDelete}
-              />
-            )}
-
-            {panelMode === 'layers' && (
-              <LayerPanel
-                layers={layers}
-                activeLayerId={drawingState.activeLayerId}
-                onLayerSelect={(id) => setDrawingState({ ...drawingState, activeLayerId: id })}
-                onLayerCreate={handleLayerCreate}
-                onLayerUpdate={handleLayerUpdate}
-                onLayerDelete={handleLayerDelete}
-                onLayerReorder={handleLayerReorder}
-              />
-            )}
-          </div>
+          )}
 
           <div className="flex justify-end">
             <Button variant="destructive" size="sm" onClick={handleDeleteMap}>

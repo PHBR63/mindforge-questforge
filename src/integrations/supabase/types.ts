@@ -442,6 +442,65 @@ export type Database = {
           },
         ]
       }
+      map_floors: {
+        Row: {
+          created_at: string
+          floor_number: number
+          floor_plan_offset_x: number | null
+          floor_plan_offset_y: number | null
+          floor_plan_opacity: number | null
+          floor_plan_scale: number | null
+          floor_plan_url: string | null
+          height: number
+          id: string
+          is_visible: boolean | null
+          map_id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          floor_number?: number
+          floor_plan_offset_x?: number | null
+          floor_plan_offset_y?: number | null
+          floor_plan_opacity?: number | null
+          floor_plan_scale?: number | null
+          floor_plan_url?: string | null
+          height?: number
+          id?: string
+          is_visible?: boolean | null
+          map_id: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          floor_number?: number
+          floor_plan_offset_x?: number | null
+          floor_plan_offset_y?: number | null
+          floor_plan_opacity?: number | null
+          floor_plan_scale?: number | null
+          floor_plan_url?: string | null
+          height?: number
+          id?: string
+          is_visible?: boolean | null
+          map_id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "map_floors_map_id_fkey"
+            columns: ["map_id"]
+            isOneToOne: false
+            referencedRelation: "maps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       map_layers: {
         Row: {
           created_at: string
@@ -485,6 +544,75 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "map_layers_map_id_fkey"
+            columns: ["map_id"]
+            isOneToOne: false
+            referencedRelation: "maps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      map_lights: {
+        Row: {
+          cast_shadows: boolean | null
+          color: string | null
+          created_at: string
+          floor_id: string
+          id: string
+          intensity: number | null
+          is_visible: boolean | null
+          light_type: string
+          map_id: string
+          position_x: number
+          position_y: number
+          position_z: number | null
+          range: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cast_shadows?: boolean | null
+          color?: string | null
+          created_at?: string
+          floor_id: string
+          id?: string
+          intensity?: number | null
+          is_visible?: boolean | null
+          light_type?: string
+          map_id: string
+          position_x: number
+          position_y: number
+          position_z?: number | null
+          range?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cast_shadows?: boolean | null
+          color?: string | null
+          created_at?: string
+          floor_id?: string
+          id?: string
+          intensity?: number | null
+          is_visible?: boolean | null
+          light_type?: string
+          map_id?: string
+          position_x?: number
+          position_y?: number
+          position_z?: number | null
+          range?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "map_lights_floor_id_fkey"
+            columns: ["floor_id"]
+            isOneToOne: false
+            referencedRelation: "map_floors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "map_lights_map_id_fkey"
             columns: ["map_id"]
             isOneToOne: false
             referencedRelation: "maps"
@@ -547,6 +675,128 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "map_tokens_map_id_fkey"
+            columns: ["map_id"]
+            isOneToOne: false
+            referencedRelation: "maps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      map_wall_openings: {
+        Row: {
+          color: string | null
+          created_at: string
+          elevation: number
+          height: number
+          id: string
+          is_open: boolean | null
+          opening_type: string
+          position_along_wall: number
+          updated_at: string
+          user_id: string
+          wall_id: string
+          width: number
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          elevation?: number
+          height?: number
+          id?: string
+          is_open?: boolean | null
+          opening_type?: string
+          position_along_wall?: number
+          updated_at?: string
+          user_id: string
+          wall_id: string
+          width?: number
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          elevation?: number
+          height?: number
+          id?: string
+          is_open?: boolean | null
+          opening_type?: string
+          position_along_wall?: number
+          updated_at?: string
+          user_id?: string
+          wall_id?: string
+          width?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "map_wall_openings_wall_id_fkey"
+            columns: ["wall_id"]
+            isOneToOne: false
+            referencedRelation: "map_walls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      map_walls: {
+        Row: {
+          color: string | null
+          created_at: string
+          end_x: number
+          end_y: number
+          floor_id: string
+          height: number
+          id: string
+          is_visible: boolean | null
+          map_id: string
+          start_x: number
+          start_y: number
+          texture: string | null
+          thickness: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          end_x: number
+          end_y: number
+          floor_id: string
+          height?: number
+          id?: string
+          is_visible?: boolean | null
+          map_id: string
+          start_x: number
+          start_y: number
+          texture?: string | null
+          thickness?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          end_x?: number
+          end_y?: number
+          floor_id?: string
+          height?: number
+          id?: string
+          is_visible?: boolean | null
+          map_id?: string
+          start_x?: number
+          start_y?: number
+          texture?: string | null
+          thickness?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "map_walls_floor_id_fkey"
+            columns: ["floor_id"]
+            isOneToOne: false
+            referencedRelation: "map_floors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "map_walls_map_id_fkey"
             columns: ["map_id"]
             isOneToOne: false
             referencedRelation: "maps"
