@@ -189,6 +189,7 @@ export default function Resources() {
     description: string;
     type: string;
     file_url: string;
+    thumbnail_url?: string;
     tags: string;
   }) => {
     if (!user) return;
@@ -198,6 +199,7 @@ export default function Resources() {
       description: data.description || null,
       type: data.type,
       file_url: data.file_url || null,
+      thumbnail_url: data.thumbnail_url || null,
       tags: data.tags ? data.tags.split(',').map(t => t.trim()) : null,
       folder_id: currentFolderId,
       user_id: user.id,

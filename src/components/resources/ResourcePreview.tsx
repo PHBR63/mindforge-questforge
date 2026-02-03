@@ -1,4 +1,4 @@
-import { X, Star, ExternalLink, Trash2, FolderInput, Image, FileText, Music, Video } from 'lucide-react';
+import { X, Star, ExternalLink, Trash2, FolderInput, Image, FileText, Music, Video, Download, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Resource, resourceTypes } from './types';
@@ -40,6 +40,58 @@ export function ResourcePreview({
   const typeInfo = resourceTypes.find(t => t.value === resource.type);
   const IconComponent = iconMap[typeInfo?.icon || 'FileText'] || FileText;
   const isVisual = ['image', 'token', 'map'].includes(resource.type);
+  const isAudio = resource.type === 'audio';
+  const isVideo = resource.type === 'video';
+
+  const renderMediaPreview = () => {
+    if (!resource.file_url) {
+      return <IconComponent className="w-20 h-20 text-muted-foreground/50" />;
+    }
+
+    if (isVisual) {
+      return (
+        <img
+          src={resource.file_url}
+          alt={resource.name}
+          className="w-full h-full object-contain"
+        />
+      );
+    }
+
+    if (isAudio) {
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center p-4 gap-4">
+          <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+            <Music className="w-10 h-10 text-primary" />
+          </div>
+          <audio 
+            controls 
+            className="w-full max-w-[240px]"
+            preload="metadata"
+          >
+            <source src={resource.file_url} />
+            Seu navegador não suporta áudio.
+          </audio>
+        </div>
+      );
+    }
+
+    if (isVideo) {
+      return (
+        <video
+          controls
+          className="w-full h-full object-contain"
+          preload="metadata"
+          poster={resource.thumbnail_url || undefined}
+        >
+          <source src={resource.file_url} />
+          Seu navegador não suporta vídeo.
+        </video>
+      );
+    }
+
+    return <IconComponent className="w-20 h-20 text-muted-foreground/50" />;
+  };
 
   return (
     <div className="w-80 border-l border-border/50 bg-card/30 flex flex-col h-full">
@@ -53,16 +105,8 @@ export function ResourcePreview({
       
       {/* Preview Area */}
       <div className="p-4 border-b border-border/50">
-        <div className="aspect-square bg-muted rounded-lg overflow-hidden flex items-center justify-center">
-          {resource.file_url && isVisual ? (
-            <img
-              src={resource.file_url}
-              alt={resource.name}
-              className="w-full h-full object-contain"
-            />
-          ) : (
-            <IconComponent className="w-20 h-20 text-muted-foreground/50" />
-          )}
+        <div className={`${isAudio ? 'aspect-video' : 'aspect-square'} bg-muted rounded-lg overflow-hidden flex items-center justify-center`}>
+          {renderMediaPreview()}
         </div>
       </div>
       
@@ -137,12 +181,20 @@ export function ResourcePreview({
       {/* Footer Actions */}
       <div className="p-3 border-t border-border/50 space-y-2">
         {resource.file_url && (
-          <Button variant="outline" size="sm" className="w-full" asChild>
-            <a href={resource.file_url} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="w-4 h-4 mr-2" />
-              Abrir Arquivo
-            </a>
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="flex-1" asChild>
+              <a href={resource.file_url} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Abrir
+              </a>
+            </Button>
+            <Button variant="outline" size="sm" className="flex-1" asChild>
+              <a href={resource.file_url} download={resource.name}>
+                <Download className="w-4 h-4 mr-2" />
+                Baixar
+              </a>
+            </Button>
+          </div>
         )}
         <Button
           variant="destructive"
