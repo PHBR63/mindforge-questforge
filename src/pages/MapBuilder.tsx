@@ -39,13 +39,14 @@ import { WallEditor } from '@/components/maps/WallEditor';
 import { Model3DLibrary } from '@/components/maps/Model3DLibrary';
 import { Map3DModel } from '@/components/maps/model3DTypes';
 import { OnlineAssetBrowser, VTTMapGallery } from '@/components/maps/onlineAssets';
+import { TilesetLibrary, type PlacedTile, type TileDefinition, getTileById } from '@/components/maps/tilesets';
 import { type UVTTImportResult } from '@/components/maps/importExport';
-import { Plus, Map, AlertCircle, Trash2, Grid3X3, Box, Sun, Moon, Flame, Package, Paintbrush, Layers, Columns, Boxes } from 'lucide-react';
+import { Plus, Map, AlertCircle, Trash2, Grid3X3, Box, Sun, Moon, Flame, Package, Paintbrush, Layers, Columns, Boxes, LayoutGrid } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 type ViewMode = '2d' | '3d' | 'walls';
 type Environment3D = 'day' | 'night' | 'dungeon';
-type PanelMode = 'tokens' | 'assets' | 'layers' | 'models3d';
+type PanelMode = 'tokens' | 'assets' | 'layers' | 'models3d' | 'tilesets';
 
 export default function MapBuilder() {
   const { activeCampaign } = useCampaignContext();
@@ -71,6 +72,12 @@ export default function MapBuilder() {
   const [environment3D, setEnvironment3D] = useState<Environment3D>('dungeon');
   const [panelMode, setPanelMode] = useState<PanelMode>('tokens');
   const [showDrawingToolbar, setShowDrawingToolbar] = useState(false);
+
+  // Tileset state
+  const [placedTiles, setPlacedTiles] = useState<PlacedTile[]>([]);
+  const [selectedTileInstanceId, setSelectedTileInstanceId] = useState<string | null>(null);
+  const [tilesetPaintMode, setTilesetPaintMode] = useState<'place' | 'paint'>('place');
+  const [activePaintTile, setActivePaintTile] = useState<TileDefinition | null>(null);
 
   // Drawing state
   const [drawingState, setDrawingState] = useState<DrawingState>({
@@ -778,6 +785,56 @@ export default function MapBuilder() {
     });
   };
 
+  // Tileset handlers
+  const handleTilePlaceStart = useCallback((tile: TileDefinition) => {
+    if (!activeMap) return;
+    // Place tile at center of map
+    const newTile: PlacedTile = {
+      id: crypto.randomUUID(),
+      tileId: tile.id,
+      x: Math.floor(activeMap.grid_width / 2),
+      y: Math.floor(activeMap.grid_height / 2),
+      rotation: 0,
+      scale: 1,
+      isVisible: true,
+    };
+    setPlacedTiles([...placedTiles, newTile]);
+    setSelectedTileInstanceId(newTile.id);
+    toast({
+      title: 'Tile adicionado',
+      description: `${tile.name} foi adicionado ao mapa.`,
+    });
+  }, [activeMap, placedTiles, toast]);
+
+  const handleTileUpdate = useCallback((id: string, updates: Partial<PlacedTile>) => {
+    setPlacedTiles(placedTiles.map(t => t.id === id ? { ...t, ...updates } : t));
+  }, [placedTiles]);
+
+  const handleTileDelete = useCallback((id: string) => {
+    setPlacedTiles(placedTiles.filter(t => t.id !== id));
+  }, [placedTiles]);
+
+  const handleTileDrop = useCallback((tileId: string, x: number, y: number) => {
+    const tileDef = getTileById(tileId);
+    if (!tileDef) return;
+    
+    const newTile: PlacedTile = {
+      id: crypto.randomUUID(),
+      tileId: tileId,
+      x,
+      y,
+      rotation: 0,
+      scale: 1,
+      isVisible: true,
+    };
+    setPlacedTiles(prev => [...prev, newTile]);
+    setSelectedTileInstanceId(newTile.id);
+  }, []);
+
+  const handleTileMove = useCallback((id: string, x: number, y: number) => {
+    setPlacedTiles(placedTiles.map(t => t.id === id ? { ...t, x, y } : t));
+  }, [placedTiles]);
+
   // Handle map import
   const handleMapImport = async (data: {
     mapData: {
@@ -1069,18 +1126,22 @@ export default function MapBuilder() {
               {/* Panel mode toggle */}
               <Tabs value={panelMode} onValueChange={(v) => setPanelMode(v as PanelMode)}>
                 <TabsList>
-                  <TabsTrigger value="tokens" className="gap-2 text-xs">
+                  <TabsTrigger value="tokens" className="gap-1 text-xs px-2">
                     Tokens
                   </TabsTrigger>
-                  <TabsTrigger value="assets" className="gap-2 text-xs">
+                  <TabsTrigger value="tilesets" className="gap-1 text-xs px-2">
+                    <LayoutGrid className="w-3 h-3" />
+                    Tiles
+                  </TabsTrigger>
+                  <TabsTrigger value="assets" className="gap-1 text-xs px-2">
                     <Package className="w-3 h-3" />
                     Assets
                   </TabsTrigger>
-                  <TabsTrigger value="models3d" className="gap-2 text-xs">
+                  <TabsTrigger value="models3d" className="gap-1 text-xs px-2">
                     <Boxes className="w-3 h-3" />
                     3D
                   </TabsTrigger>
-                  <TabsTrigger value="layers" className="gap-2 text-xs">
+                  <TabsTrigger value="layers" className="gap-1 text-xs px-2">
                     <Layers className="w-3 h-3" />
                     Camadas
                   </TabsTrigger>
@@ -1176,10 +1237,29 @@ export default function MapBuilder() {
                     onModel3DMove={(modelId, x, y) => {
                       handleModel3DUpdate(modelId, { position_x: x, position_y: y });
                     }}
-                    onCellClick={(x, y) => console.log('Cell clicked:', x, y)}
+                    onCellClick={(x, y) => {
+                      // In paint mode, place a tile
+                      if (tilesetPaintMode === 'paint' && activePaintTile) {
+                        handleTileDrop(activePaintTile.id, x, y);
+                      } else {
+                        console.log('Cell clicked:', x, y);
+                      }
+                    }}
                     onAssetDrop={handleAssetPlace}
                     onDrawingComplete={handleDrawingComplete}
                     onSwitchTo3D={() => setViewMode('3d')}
+                    placedTiles={placedTiles}
+                    selectedTileInstanceId={selectedTileInstanceId}
+                    onTileSelect={(id) => {
+                      setSelectedTileInstanceId(id);
+                      if (id) {
+                        setSelectedTokenId(null);
+                        setSelectedAssetId(null);
+                        setSelectedModel3DId(null);
+                      }
+                    }}
+                    onTileMove={handleTileMove}
+                    onTileDrop={handleTileDrop}
                   />
                 ) : (
                   <MapScene3D
@@ -1214,6 +1294,21 @@ export default function MapBuilder() {
                   onTokenCreate={handleTokenCreate}
                   onTokenUpdate={handleTokenUpdate}
                   onTokenDelete={handleTokenDelete}
+                />
+              )}
+
+              {panelMode === 'tilesets' && (
+                <TilesetLibrary
+                  placedTiles={placedTiles}
+                  selectedTileInstanceId={selectedTileInstanceId}
+                  onTileSelect={setSelectedTileInstanceId}
+                  onTilePlaceStart={handleTilePlaceStart}
+                  onTileUpdate={handleTileUpdate}
+                  onTileDelete={handleTileDelete}
+                  paintMode={tilesetPaintMode}
+                  onPaintModeChange={setTilesetPaintMode}
+                  activePaintTile={activePaintTile}
+                  onActivePaintTileChange={setActivePaintTile}
                 />
               )}
 
