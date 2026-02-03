@@ -408,7 +408,7 @@ export default function MapBuilder() {
   };
 
   // Asset handlers
-  const handleAssetPlace = async (assetKey: string, category: string, x?: number, y?: number) => {
+  const handleAssetPlace = async (assetKey: string, category: string, x?: number, y?: number, customImageUrl?: string, name?: string) => {
     if (!activeMap || !user) return;
 
     const { data, error } = await supabase
@@ -420,6 +420,8 @@ export default function MapBuilder() {
         asset_key: assetKey,
         position_x: x ?? Math.random() * (activeMap.grid_width - 1),
         position_y: y ?? Math.random() * (activeMap.grid_height - 1),
+        custom_image_url: customImageUrl || null,
+        name: name || null,
       })
       .select()
       .single();
@@ -434,6 +436,13 @@ export default function MapBuilder() {
     }
 
     setAssets([...assets, data as MapAsset]);
+    
+    if (customImageUrl) {
+      toast({
+        title: 'Asset adicionado!',
+        description: `${name || 'Asset'} foi colocado no mapa.`,
+      });
+    }
   };
 
   const handleAssetMove = async (assetId: string, x: number, y: number) => {

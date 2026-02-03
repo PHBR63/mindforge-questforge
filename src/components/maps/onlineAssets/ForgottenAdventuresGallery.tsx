@@ -355,7 +355,20 @@ export function ForgottenAdventuresGallery({ onAssetSelect }: ForgottenAdventure
                   {filteredCachedAssets.map((asset) => (
                     <div
                       key={asset.id}
-                      className="group relative rounded-lg border bg-card overflow-hidden hover:border-primary/50 transition-all cursor-pointer"
+                      className="group relative rounded-lg border bg-card overflow-hidden hover:border-primary/50 transition-all cursor-grab active:cursor-grabbing"
+                      draggable
+                      onDragStart={(e) => {
+                        const dragData = {
+                          type: 'cached-asset',
+                          assetId: asset.id,
+                          assetKey: `cached-${asset.id}`,
+                          category: 'cached',
+                          name: asset.name,
+                          thumbnailUrl: asset.thumbnailUrl,
+                        };
+                        e.dataTransfer.setData('application/json', JSON.stringify(dragData));
+                        e.dataTransfer.effectAllowed = 'copy';
+                      }}
                       onClick={() => handleUseCached(asset)}
                     >
                       <div className="aspect-square bg-muted relative overflow-hidden">
@@ -364,6 +377,7 @@ export function ForgottenAdventuresGallery({ onAssetSelect }: ForgottenAdventure
                           alt={asset.name}
                           className="w-full h-full object-cover"
                           loading="lazy"
+                          draggable={false}
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = '/placeholder.svg';
                           }}
@@ -375,6 +389,7 @@ export function ForgottenAdventuresGallery({ onAssetSelect }: ForgottenAdventure
                       <div className="p-2">
                         <p className="text-xs font-medium truncate">{asset.name}</p>
                         <p className="text-xs text-muted-foreground">{asset.category}</p>
+                        <p className="text-[10px] text-muted-foreground/70">Arraste para o mapa</p>
                       </div>
                       <Button
                         variant="ghost"
