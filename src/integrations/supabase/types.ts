@@ -106,6 +106,158 @@ export type Database = {
           },
         ]
       }
+      investigation_boards: {
+        Row: {
+          background_color: string | null
+          campaign_id: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          background_color?: string | null
+          campaign_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          background_color?: string | null
+          campaign_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investigation_boards_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      investigation_clues: {
+        Row: {
+          board_id: string
+          clue_type: string | null
+          color: string | null
+          content: string | null
+          created_at: string
+          id: string
+          image_url: string | null
+          is_pinned: boolean | null
+          position_x: number
+          position_y: number
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          board_id: string
+          clue_type?: string | null
+          color?: string | null
+          content?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          is_pinned?: boolean | null
+          position_x?: number
+          position_y?: number
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          board_id?: string
+          clue_type?: string | null
+          color?: string | null
+          content?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          is_pinned?: boolean | null
+          position_x?: number
+          position_y?: number
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investigation_clues_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "investigation_boards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      investigation_connections: {
+        Row: {
+          board_id: string
+          color: string | null
+          created_at: string
+          id: string
+          label: string | null
+          source_clue_id: string
+          target_clue_id: string
+          user_id: string
+        }
+        Insert: {
+          board_id: string
+          color?: string | null
+          created_at?: string
+          id?: string
+          label?: string | null
+          source_clue_id: string
+          target_clue_id: string
+          user_id: string
+        }
+        Update: {
+          board_id?: string
+          color?: string | null
+          created_at?: string
+          id?: string
+          label?: string | null
+          source_clue_id?: string
+          target_clue_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investigation_connections_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "investigation_boards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investigation_connections_source_clue_id_fkey"
+            columns: ["source_clue_id"]
+            isOneToOne: false
+            referencedRelation: "investigation_clues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investigation_connections_target_clue_id_fkey"
+            columns: ["target_clue_id"]
+            isOneToOne: false
+            referencedRelation: "investigation_clues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       locations: {
         Row: {
           campaign_id: string
