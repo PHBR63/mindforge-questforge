@@ -25,6 +25,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { detectResourceType, validateFile } from '@/hooks/useFileUpload';
 
 interface AddResourceDialogProps {
   open: boolean;
@@ -37,6 +38,14 @@ interface AddResourceDialogProps {
     thumbnail_url?: string;
     tags: string;
   }) => void;
+  onSubmitMultiple?: (files: Array<{
+    name: string;
+    description: string;
+    type: string;
+    file_url: string;
+    thumbnail_url?: string;
+    tags: string;
+  }>) => void;
 }
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -58,7 +67,14 @@ const ACCEPTED_FILE_TYPES: Record<string, string[]> = {
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
-export function AddResourceDialog({ open, onOpenChange, onSubmit }: AddResourceDialogProps) {
+interface SelectedFile {
+  file: File;
+  previewUrl: string | null;
+  name: string;
+  type: string;
+}
+
+export function AddResourceDialog({ open, onOpenChange, onSubmit, onSubmitMultiple }: AddResourceDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -70,98 +86,94 @@ export function AddResourceDialog({ open, onOpenChange, onSubmit }: AddResourceD
     file_url: '',
     tags: '',
   });
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [currentUploadIndex, setCurrentUploadIndex] = useState(0);
   const [useUrl, setUseUrl] = useState(false);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
 
-    // Validate file size
-    if (file.size > MAX_FILE_SIZE) {
-      toast({ 
-        variant: 'destructive', 
-        title: 'Arquivo muito grande', 
-        description: 'O tamanho máximo é 50MB' 
-      });
-      return;
-    }
+    const newSelectedFiles: SelectedFile[] = [];
 
-    // Validate file type
-    const acceptedTypes = ACCEPTED_FILE_TYPES[formData.type] || [];
-    if (acceptedTypes[0] !== '*/*' && !acceptedTypes.some(t => file.type.startsWith(t.replace('/*', '')))) {
-      toast({ 
-        variant: 'destructive', 
-        title: 'Tipo de arquivo inválido', 
-        description: `Selecione um arquivo do tipo: ${formData.type}` 
-      });
-      return;
-    }
+    for (const file of files) {
+      // Validate file size
+      const validation = validateFile(file);
+      if (!validation.valid) {
+        toast({ 
+          variant: 'destructive', 
+          title: 'Arquivo muito grande', 
+          description: `${file.name}: ${validation.error}` 
+        });
+        continue;
+      }
 
-    setSelectedFile(file);
-    
-    // Auto-fill name if empty
-    if (!formData.name.trim()) {
+      const detectedType = detectResourceType(file);
       const fileName = file.name.replace(/\.[^/.]+$/, '');
-      setFormData(prev => ({ ...prev, name: fileName }));
+      
+      // Create preview for images
+      let previewUrl: string | null = null;
+      if (file.type.startsWith('image/')) {
+        previewUrl = URL.createObjectURL(file);
+      }
+
+      newSelectedFiles.push({
+        file,
+        previewUrl,
+        name: fileName,
+        type: detectedType,
+      });
     }
 
-    // Create preview for images
-    if (file.type.startsWith('image/')) {
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
-    } else {
-      setPreviewUrl(null);
+    if (newSelectedFiles.length > 0) {
+      setSelectedFiles(prev => [...prev, ...newSelectedFiles]);
+      
+      // Auto-fill name if single file and name is empty
+      if (newSelectedFiles.length === 1 && selectedFiles.length === 0 && !formData.name.trim()) {
+        setFormData(prev => ({ ...prev, name: newSelectedFiles[0].name }));
+      }
     }
   };
 
-  const clearFile = () => {
-    setSelectedFile(null);
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-      setPreviewUrl(null);
-    }
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => {
+      const file = prev[index];
+      if (file.previewUrl) {
+        URL.revokeObjectURL(file.previewUrl);
+      }
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const clearAllFiles = () => {
+    selectedFiles.forEach(f => {
+      if (f.previewUrl) URL.revokeObjectURL(f.previewUrl);
+    });
+    setSelectedFiles([]);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  const uploadFile = async (): Promise<string | null> => {
-    if (!selectedFile || !user) return null;
-
-    setIsUploading(true);
-    setUploadProgress(0);
+  const uploadFile = async (file: File, resourceType: string): Promise<string | null> => {
+    if (!user) return null;
 
     try {
-      // Create unique file path: userId/type/timestamp_filename
       const timestamp = Date.now();
-      const sanitizedName = selectedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const filePath = `${user.id}/${formData.type}/${timestamp}_${sanitizedName}`;
-
-      // Simulate progress for user feedback
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => Math.min(prev + 10, 90));
-      }, 200);
+      const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const filePath = `${user.id}/${resourceType}/${timestamp}_${sanitizedName}`;
 
       const { data, error } = await supabase.storage
         .from('campaign-assets')
-        .upload(filePath, selectedFile, {
+        .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false,
         });
 
-      clearInterval(progressInterval);
+      if (error) throw error;
 
-      if (error) {
-        throw error;
-      }
-
-      setUploadProgress(100);
-
-      // Get public URL
       const { data: urlData } = supabase.storage
         .from('campaign-assets')
         .getPublicUrl(data.path);
@@ -169,107 +181,155 @@ export function AddResourceDialog({ open, onOpenChange, onSubmit }: AddResourceD
       return urlData.publicUrl;
     } catch (error: any) {
       console.error('Upload error:', error);
-      toast({ 
-        variant: 'destructive', 
-        title: 'Erro no upload', 
-        description: error.message || 'Não foi possível fazer o upload do arquivo' 
-      });
-      return null;
-    } finally {
-      setIsUploading(false);
+      throw error;
     }
   };
 
   const handleSubmit = async () => {
-    if (!formData.name.trim()) {
-      toast({ variant: 'destructive', title: 'Nome obrigatório' });
+    // Single file or URL mode
+    if (selectedFiles.length <= 1 && !onSubmitMultiple) {
+      if (!formData.name.trim()) {
+        toast({ variant: 'destructive', title: 'Nome obrigatório' });
+        return;
+      }
+
+      let fileUrl = formData.file_url;
+
+      if (selectedFiles.length === 1) {
+        setIsUploading(true);
+        setUploadProgress(0);
+        
+        const progressInterval = setInterval(() => {
+          setUploadProgress(prev => Math.min(prev + 10, 90));
+        }, 200);
+
+        try {
+          const uploadedUrl = await uploadFile(selectedFiles[0].file, selectedFiles[0].type);
+          clearInterval(progressInterval);
+          
+          if (!uploadedUrl) {
+            toast({ variant: 'destructive', title: 'Erro no upload' });
+            setIsUploading(false);
+            return;
+          }
+          fileUrl = uploadedUrl;
+          setUploadProgress(100);
+        } catch (error: any) {
+          clearInterval(progressInterval);
+          toast({ variant: 'destructive', title: 'Erro no upload', description: error.message });
+          setIsUploading(false);
+          return;
+        }
+      }
+
+      onSubmit({
+        ...formData,
+        file_url: fileUrl,
+        thumbnail_url: fileUrl,
+      });
+
+      resetForm();
       return;
     }
 
-    let fileUrl = formData.file_url;
+    // Multiple files mode
+    if (selectedFiles.length > 1 && onSubmitMultiple) {
+      setIsUploading(true);
+      setUploadProgress(0);
+      setCurrentUploadIndex(0);
 
-    // Upload file if selected
-    if (selectedFile) {
-      const uploadedUrl = await uploadFile();
-      if (!uploadedUrl) return;
-      fileUrl = uploadedUrl;
+      const uploadedResources: Array<{
+        name: string;
+        description: string;
+        type: string;
+        file_url: string;
+        thumbnail_url?: string;
+        tags: string;
+      }> = [];
+
+      for (let i = 0; i < selectedFiles.length; i++) {
+        setCurrentUploadIndex(i);
+        const selectedFile = selectedFiles[i];
+        
+        try {
+          const uploadedUrl = await uploadFile(selectedFile.file, selectedFile.type);
+          if (uploadedUrl) {
+            uploadedResources.push({
+              name: selectedFile.name,
+              description: formData.description,
+              type: selectedFile.type,
+              file_url: uploadedUrl,
+              thumbnail_url: uploadedUrl,
+              tags: formData.tags,
+            });
+          }
+        } catch (error: any) {
+          toast({ 
+            variant: 'destructive', 
+            title: `Erro ao enviar ${selectedFile.name}`, 
+            description: error.message 
+          });
+        }
+
+        setUploadProgress(Math.round(((i + 1) / selectedFiles.length) * 100));
+      }
+
+      if (uploadedResources.length > 0) {
+        onSubmitMultiple(uploadedResources);
+        toast({ 
+          title: 'Upload concluído', 
+          description: `${uploadedResources.length} de ${selectedFiles.length} arquivos enviados` 
+        });
+      }
+
+      resetForm();
     }
+  };
 
-    onSubmit({
-      ...formData,
-      file_url: fileUrl,
-      thumbnail_url: fileUrl, // For images, use same URL as thumbnail
-    });
-
-    // Reset form
+  const resetForm = () => {
     setFormData({ name: '', description: '', type: 'image', file_url: '', tags: '' });
-    clearFile();
+    clearAllFiles();
     setUseUrl(false);
+    setIsUploading(false);
+    setUploadProgress(0);
+    setCurrentUploadIndex(0);
   };
 
   const handleClose = (isOpen: boolean) => {
     if (!isOpen) {
-      clearFile();
-      setFormData({ name: '', description: '', type: 'image', file_url: '', tags: '' });
-      setUseUrl(false);
+      resetForm();
     }
     onOpenChange(isOpen);
   };
 
   const getAcceptString = () => {
-    const types = ACCEPTED_FILE_TYPES[formData.type] || [];
-    if (types[0] === '*/*') return undefined;
-    return types.join(',');
+    // Accept all supported types for multiple files
+    const allTypes = Object.values(ACCEPTED_FILE_TYPES).flat().filter(t => t !== '*/*');
+    return allTypes.join(',');
   };
+
+  const isSingleFileMode = selectedFiles.length <= 1;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display">Adicionar Recurso</DialogTitle>
+          <DialogTitle className="font-display">Adicionar Recursos</DialogTitle>
           <DialogDescription>
-            Faça upload de imagens, áudios, vídeos, tokens e outros recursos
+            Faça upload de imagens, áudios, vídeos, tokens e outros recursos. Você pode selecionar múltiplos arquivos.
           </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label>Tipo</Label>
-            <Select 
-              value={formData.type} 
-              onValueChange={(v) => {
-                setFormData({ ...formData, type: v });
-                clearFile();
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {resourceTypes.map((t) => {
-                  const IconComponent = iconMap[t.icon] || FileText;
-                  return (
-                    <SelectItem key={t.value} value={t.value}>
-                      <div className="flex items-center gap-2">
-                        <IconComponent className="w-4 h-4" />
-                        {t.label}
-                      </div>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-          </div>
-
           {/* File Upload Area */}
           {!useUrl && (
             <div className="space-y-2">
-              <Label>Arquivo</Label>
+              <Label>Arquivos</Label>
               <div
                 className={cn(
                   "border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer",
                   "hover:border-primary/50 hover:bg-primary/5",
-                  selectedFile ? "border-primary bg-primary/5" : "border-border"
+                  selectedFiles.length > 0 ? "border-primary bg-primary/5" : "border-border"
                 )}
                 onClick={() => fileInputRef.current?.click()}
               >
@@ -279,52 +339,76 @@ export function AddResourceDialog({ open, onOpenChange, onSubmit }: AddResourceD
                   accept={getAcceptString()}
                   onChange={handleFileSelect}
                   className="hidden"
+                  multiple
                 />
                 
-                {selectedFile ? (
-                  <div className="space-y-2">
-                    {previewUrl ? (
-                      <div className="relative inline-block">
-                        <img 
-                          src={previewUrl} 
-                          alt="Preview" 
-                          className="max-h-32 mx-auto rounded-md"
-                        />
-                        <button
-                          onClick={(e) => { e.stopPropagation(); clearFile(); }}
-                          className="absolute -top-2 -right-2 p-1 bg-destructive text-destructive-foreground rounded-full"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center gap-2">
-                        <FileText className="w-8 h-8 text-primary" />
-                        <div className="text-left">
-                          <p className="text-sm font-medium truncate max-w-[200px]">
+                {selectedFiles.length > 0 ? (
+                  <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                    <div className="grid grid-cols-3 gap-2">
+                      {selectedFiles.slice(0, 6).map((selectedFile, index) => (
+                        <div key={index} className="relative group">
+                          {selectedFile.previewUrl ? (
+                            <img 
+                              src={selectedFile.previewUrl} 
+                              alt={selectedFile.name}
+                              className="w-full h-20 object-cover rounded-md"
+                            />
+                          ) : (
+                            <div className="w-full h-20 bg-muted rounded-md flex items-center justify-center">
+                              <FileText className="w-8 h-8 text-muted-foreground" />
+                            </div>
+                          )}
+                          <button
+                            onClick={() => removeFile(index)}
+                            className="absolute -top-1 -right-1 p-1 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                          <p className="text-[10px] text-muted-foreground truncate mt-1">
                             {selectedFile.name}
                           </p>
-                          <p className="text-xs text-muted-foreground">
-                            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                          </p>
                         </div>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); clearFile(); }}
-                          className="p-1 hover:bg-destructive/10 rounded"
-                        >
-                          <X className="w-4 h-4 text-destructive" />
-                        </button>
-                      </div>
+                      ))}
+                    </div>
+                    
+                    {selectedFiles.length > 6 && (
+                      <p className="text-xs text-muted-foreground">
+                        +{selectedFiles.length - 6} mais arquivo(s)
+                      </p>
                     )}
+                    
+                    <div className="flex items-center justify-center gap-2 pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Upload className="w-4 h-4 mr-1" />
+                        Adicionar mais
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearAllFiles}
+                      >
+                        Limpar tudo
+                      </Button>
+                    </div>
+                    
+                    <p className="text-xs text-muted-foreground">
+                      {selectedFiles.length} arquivo(s) selecionado(s)
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-2 py-4">
                     <Upload className="w-10 h-10 mx-auto text-muted-foreground" />
                     <div>
                       <p className="text-sm font-medium">Clique para selecionar</p>
-                      <p className="text-xs text-muted-foreground">ou arraste um arquivo aqui</p>
+                      <p className="text-xs text-muted-foreground">ou arraste arquivos aqui</p>
                     </div>
-                    <p className="text-xs text-muted-foreground">Máximo: 50MB</p>
+                    <p className="text-xs text-muted-foreground">Suporta múltiplos arquivos • Máximo: 50MB cada</p>
                   </div>
                 )}
               </div>
@@ -363,22 +447,55 @@ export function AddResourceDialog({ open, onOpenChange, onSubmit }: AddResourceD
             <div className="space-y-2">
               <Progress value={uploadProgress} className="h-2" />
               <p className="text-xs text-muted-foreground text-center">
-                Enviando... {uploadProgress}%
+                {selectedFiles.length > 1 
+                  ? `Enviando ${currentUploadIndex + 1} de ${selectedFiles.length}... ${uploadProgress}%`
+                  : `Enviando... ${uploadProgress}%`
+                }
               </p>
             </div>
           )}
+
+          {/* Single file mode: show name and type fields */}
+          {isSingleFileMode && (
+            <>
+              <div className="space-y-2">
+                <Label>Tipo</Label>
+                <Select 
+                  value={formData.type} 
+                  onValueChange={(v) => setFormData({ ...formData, type: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {resourceTypes.map((t) => {
+                      const IconComponent = iconMap[t.icon] || FileText;
+                      return (
+                        <SelectItem key={t.value} value={t.value}>
+                          <div className="flex items-center gap-2">
+                            <IconComponent className="w-4 h-4" />
+                            {t.label}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Nome *</Label>
+                <Input
+                  placeholder="Nome do recurso"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+            </>
+          )}
           
           <div className="space-y-2">
-            <Label>Nome *</Label>
-            <Input
-              placeholder="Nome do recurso"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label>Descrição</Label>
+            <Label>Descrição {selectedFiles.length > 1 && '(aplicada a todos)'}</Label>
             <Textarea
               placeholder="Descrição do recurso..."
               value={formData.description}
@@ -388,7 +505,7 @@ export function AddResourceDialog({ open, onOpenChange, onSubmit }: AddResourceD
           </div>
           
           <div className="space-y-2">
-            <Label>Tags (separadas por vírgula)</Label>
+            <Label>Tags {selectedFiles.length > 1 && '(aplicadas a todos)'}</Label>
             <Input
               placeholder="mapa, cidade, fantasia..."
               value={formData.tags}
@@ -401,14 +518,17 @@ export function AddResourceDialog({ open, onOpenChange, onSubmit }: AddResourceD
           <Button variant="outline" onClick={() => handleClose(false)} disabled={isUploading}>
             Cancelar
           </Button>
-          <Button onClick={handleSubmit} disabled={isUploading || (!selectedFile && !formData.file_url && !formData.name)}>
+          <Button 
+            onClick={handleSubmit} 
+            disabled={isUploading || (selectedFiles.length === 0 && !formData.file_url) || (isSingleFileMode && !formData.name.trim())}
+          >
             {isUploading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Enviando...
               </>
             ) : (
-              'Adicionar'
+              selectedFiles.length > 1 ? `Adicionar ${selectedFiles.length} arquivos` : 'Adicionar'
             )}
           </Button>
         </DialogFooter>
