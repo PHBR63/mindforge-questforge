@@ -35,12 +35,15 @@ import { MapData, MapToken } from '@/components/maps/types';
 import { MapAsset } from '@/components/maps/assetTypes';
 import { MapDrawing, MapLayer, DrawingState, DrawingTool, DEFAULT_LAYERS } from '@/components/maps/drawingTypes';
 import { WallEditor } from '@/components/maps/WallEditor';
-import { Plus, Map, AlertCircle, Trash2, Grid3X3, Box, Sun, Moon, Flame, Package, Paintbrush, Layers, Columns } from 'lucide-react';
+import { Model3DLibrary } from '@/components/maps/Model3DLibrary';
+import { Models3DRenderer } from '@/components/maps/Models3DRenderer';
+import { Map3DModel } from '@/components/maps/model3DTypes';
+import { Plus, Map, AlertCircle, Trash2, Grid3X3, Box, Sun, Moon, Flame, Package, Paintbrush, Layers, Columns, Boxes } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 type ViewMode = '2d' | '3d' | 'walls';
 type Environment3D = 'day' | 'night' | 'dungeon';
-type PanelMode = 'tokens' | 'assets' | 'layers';
+type PanelMode = 'tokens' | 'assets' | 'layers' | 'models3d';
 
 export default function MapBuilder() {
   const { activeCampaign } = useCampaignContext();
@@ -56,6 +59,8 @@ export default function MapBuilder() {
   const [layers, setLayers] = useState<MapLayer[]>([]);
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [models3D, setModels3D] = useState<Map3DModel[]>([]);
+  const [selectedModel3DId, setSelectedModel3DId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -117,11 +122,12 @@ export default function MapBuilder() {
       setAssets([]);
       setDrawings([]);
       setLayers([]);
+      setModels3D([]);
       return;
     }
 
     const loadMapData = async () => {
-      const [tokensResult, assetsResult, drawingsResult, layersResult] = await Promise.all([
+      const [tokensResult, assetsResult, drawingsResult, layersResult, models3DResult] = await Promise.all([
         supabase
           .from('map_tokens')
           .select('*')
@@ -142,6 +148,11 @@ export default function MapBuilder() {
           .select('*')
           .eq('map_id', activeMap.id)
           .order('layer_order', { ascending: true }),
+        supabase
+          .from('map_3d_models')
+          .select('*')
+          .eq('map_id', activeMap.id)
+          .order('layer', { ascending: true }),
       ]);
 
       if (tokensResult.error) {
@@ -172,6 +183,22 @@ export default function MapBuilder() {
         console.error('Error loading layers:', layersResult.error);
       } else {
         setLayers(layersResult.data as MapLayer[]);
+      }
+
+      if (models3DResult.error) {
+        console.error('Error loading 3D models:', models3DResult.error);
+      } else {
+        const typedModels = (models3DResult.data || []).map((m: any) => ({
+          ...m,
+          position_x: Number(m.position_x),
+          position_y: Number(m.position_y),
+          position_z: Number(m.position_z),
+          rotation_x: Number(m.rotation_x),
+          rotation_y: Number(m.rotation_y),
+          rotation_z: Number(m.rotation_z),
+          scale: Number(m.scale),
+        })) as Map3DModel[];
+        setModels3D(typedModels);
       }
     };
 
@@ -596,6 +623,101 @@ export default function MapBuilder() {
     // TODO: Implement layer reordering with drag and drop
   };
 
+  // 3D Model handlers
+  const handleModel3DCreate = async (
+    modelData: Omit<Map3DModel, 'id' | 'map_id' | 'user_id' | 'created_at' | 'updated_at'>
+  ) => {
+    if (!activeMap || !user) return;
+
+    const { data, error } = await supabase
+      .from('map_3d_models')
+      .insert({
+        map_id: activeMap.id,
+        user_id: user.id,
+        name: modelData.name,
+        file_url: modelData.file_url,
+        thumbnail_url: modelData.thumbnail_url,
+        position_x: modelData.position_x,
+        position_y: modelData.position_y,
+        position_z: modelData.position_z,
+        rotation_x: modelData.rotation_x,
+        rotation_y: modelData.rotation_y,
+        rotation_z: modelData.rotation_z,
+        scale: modelData.scale,
+        layer: modelData.layer,
+        is_visible: modelData.is_visible,
+        animation_name: modelData.animation_name,
+        animation_playing: modelData.animation_playing,
+        metadata: modelData.metadata,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao adicionar modelo 3D',
+        description: error.message,
+      });
+      return;
+    }
+
+    const newModel = {
+      ...data,
+      position_x: Number(data.position_x),
+      position_y: Number(data.position_y),
+      position_z: Number(data.position_z),
+      rotation_x: Number(data.rotation_x),
+      rotation_y: Number(data.rotation_y),
+      rotation_z: Number(data.rotation_z),
+      scale: Number(data.scale),
+    } as Map3DModel;
+
+    setModels3D([...models3D, newModel]);
+    toast({
+      title: 'Modelo adicionado!',
+      description: `${modelData.name} foi adicionado ao mapa.`,
+    });
+  };
+
+  const handleModel3DUpdate = async (modelId: string, updates: Partial<Map3DModel>) => {
+    setModels3D(models3D.map((m) => (m.id === modelId ? { ...m, ...updates } : m)));
+
+    // Filter out fields that shouldn't be sent to DB
+    const { id, map_id, user_id, created_at, updated_at, ...dbUpdates } = updates as any;
+
+    const { error } = await supabase
+      .from('map_3d_models')
+      .update(dbUpdates)
+      .eq('id', modelId);
+
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao atualizar modelo 3D',
+        description: error.message,
+      });
+    }
+  };
+
+  const handleModel3DDelete = async (modelId: string) => {
+    const { error } = await supabase
+      .from('map_3d_models')
+      .delete()
+      .eq('id', modelId);
+
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao excluir modelo 3D',
+        description: error.message,
+      });
+      return;
+    }
+
+    setModels3D(models3D.filter((m) => m.id !== modelId));
+  };
+
   if (!activeCampaign) {
     return (
       <AppLayout title="Construtor de Mapas">
@@ -733,6 +855,10 @@ export default function MapBuilder() {
                     <Package className="w-3 h-3" />
                     Assets
                   </TabsTrigger>
+                  <TabsTrigger value="models3d" className="gap-2 text-xs">
+                    <Boxes className="w-3 h-3" />
+                    3D
+                  </TabsTrigger>
                   <TabsTrigger value="layers" className="gap-2 text-xs">
                     <Layers className="w-3 h-3" />
                     Camadas
@@ -822,8 +948,11 @@ export default function MapBuilder() {
                     cellSize={activeMap.cell_size / 10}
                     backgroundColor={activeMap.background_color || '#1a1a2e'}
                     tokens={tokens}
+                    models3D={models3D}
                     selectedTokenId={selectedTokenId}
+                    selectedModel3DId={selectedModel3DId}
                     onTokenSelect={setSelectedTokenId}
+                    onModel3DSelect={setSelectedModel3DId}
                     environment={environment3D}
                   />
                 )}
@@ -848,6 +977,18 @@ export default function MapBuilder() {
                   onAssetPlace={(key, cat) => handleAssetPlace(key, cat)}
                   onAssetUpdate={handleAssetUpdate}
                   onAssetDelete={handleAssetDelete}
+                />
+              )}
+
+              {panelMode === 'models3d' && activeMap && (
+                <Model3DLibrary
+                  mapId={activeMap.id}
+                  models={models3D}
+                  selectedModelId={selectedModel3DId}
+                  onModelSelect={setSelectedModel3DId}
+                  onModelCreate={handleModel3DCreate}
+                  onModelUpdate={handleModel3DUpdate}
+                  onModelDelete={handleModel3DDelete}
                 />
               )}
 
