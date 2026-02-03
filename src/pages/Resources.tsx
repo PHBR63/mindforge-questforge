@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useCampaignContext } from '@/contexts/CampaignContext';
@@ -6,148 +6,253 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { Plus, FolderOpen, Search, Image, FileText, Music, Video, Upload, MoreVertical, Trash2, ExternalLink } from 'lucide-react';
+import { Plus, Search, ChevronRight, Home } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-
-interface Resource {
-  id: string;
-  name: string;
-  description: string | null;
-  type: string;
-  file_url: string | null;
-  thumbnail_url: string | null;
-  tags: string[] | null;
-  is_global: boolean;
-}
-
-const resourceTypes = [
-  { value: 'image', label: 'Imagem', icon: Image },
-  { value: 'document', label: 'Documento', icon: FileText },
-  { value: 'audio', label: 'Áudio', icon: Music },
-  { value: 'video', label: 'Vídeo', icon: Video },
-  { value: 'token', label: 'Token', icon: Image },
-  { value: 'map', label: 'Mapa', icon: Image },
-  { value: 'other', label: 'Outro', icon: FileText },
-];
+import { FolderTree } from '@/components/resources/FolderTree';
+import { ResourceGrid } from '@/components/resources/ResourceGrid';
+import { ResourcePreview } from '@/components/resources/ResourcePreview';
+import { AddResourceDialog } from '@/components/resources/AddResourceDialog';
+import { MoveToFolderDialog } from '@/components/resources/MoveToFolderDialog';
+import { Resource, ResourceFolder, FolderTreeItem } from '@/components/resources/types';
 
 export default function Resources() {
   const { activeCampaign } = useCampaignContext();
   const { user } = useAuth();
   const { toast } = useToast();
+  
   const [resources, setResources] = useState<Resource[]>([]);
+  const [folders, setFolders] = useState<ResourceFolder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('all');
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    type: 'image',
-    file_url: '',
-    tags: '',
-  });
+  
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [showingFavorites, setShowingFavorites] = useState(false);
+  const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
+  
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
+  const [resourceToMove, setResourceToMove] = useState<string | null>(null);
 
   useEffect(() => {
-    loadResources();
+    loadData();
   }, [activeCampaign, user]);
 
-  const loadResources = async () => {
+  const loadData = async () => {
     if (!user) return;
     setIsLoading(true);
     
-    let query = supabase
+    // Load folders
+    let foldersQuery = supabase
+      .from('resource_folders')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('name');
+    
+    if (activeCampaign) {
+      foldersQuery = foldersQuery.or(`campaign_id.eq.${activeCampaign.id},is_global.eq.true`);
+    } else {
+      foldersQuery = foldersQuery.eq('is_global', true);
+    }
+    
+    // Load resources
+    let resourcesQuery = supabase
       .from('resources')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
-
+    
     if (activeCampaign) {
-      query = query.or(`campaign_id.eq.${activeCampaign.id},is_global.eq.true`);
+      resourcesQuery = resourcesQuery.or(`campaign_id.eq.${activeCampaign.id},is_global.eq.true`);
     } else {
-      query = query.eq('is_global', true);
+      resourcesQuery = resourcesQuery.eq('is_global', true);
     }
-
-    const { data, error } = await query;
-
-    if (error) {
-      toast({ variant: 'destructive', title: 'Erro', description: error.message });
+    
+    const [foldersResult, resourcesResult] = await Promise.all([
+      foldersQuery,
+      resourcesQuery,
+    ]);
+    
+    if (foldersResult.error) {
+      toast({ variant: 'destructive', title: 'Erro', description: foldersResult.error.message });
     } else {
-      setResources(data || []);
+      setFolders(foldersResult.data || []);
     }
+    
+    if (resourcesResult.error) {
+      toast({ variant: 'destructive', title: 'Erro', description: resourcesResult.error.message });
+    } else {
+      setResources((resourcesResult.data || []) as Resource[]);
+    }
+    
     setIsLoading(false);
   };
 
-  const handleCreate = async () => {
-    if (!formData.name.trim() || !user) return;
+  // Build folder tree structure
+  const folderTree = useMemo(() => {
+    const buildTree = (parentId: string | null): FolderTreeItem[] => {
+      return folders
+        .filter(f => f.parent_id === parentId)
+        .map(f => ({
+          ...f,
+          children: buildTree(f.id),
+        }));
+    };
+    return buildTree(null);
+  }, [folders]);
 
-    const { error } = await supabase.from('resources').insert({
-      name: formData.name,
-      description: formData.description || null,
-      type: formData.type,
-      file_url: formData.file_url || null,
-      tags: formData.tags ? formData.tags.split(',').map(t => t.trim()) : null,
+  // Get current breadcrumb path
+  const breadcrumbPath = useMemo(() => {
+    const path: ResourceFolder[] = [];
+    let current = folders.find(f => f.id === currentFolderId);
+    while (current) {
+      path.unshift(current);
+      current = folders.find(f => f.id === current?.parent_id);
+    }
+    return path;
+  }, [folders, currentFolderId]);
+
+  // Filter resources based on current view
+  const filteredResources = useMemo(() => {
+    let result = resources;
+    
+    if (showingFavorites) {
+      result = result.filter(r => r.is_favorite);
+    } else {
+      result = result.filter(r => r.folder_id === currentFolderId);
+    }
+    
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(r =>
+        r.name.toLowerCase().includes(term) ||
+        r.description?.toLowerCase().includes(term) ||
+        r.tags?.some(t => t.toLowerCase().includes(term))
+      );
+    }
+    
+    return result;
+  }, [resources, currentFolderId, showingFavorites, searchTerm]);
+
+  const handleFolderSelect = (folderId: string | null) => {
+    setCurrentFolderId(folderId);
+    setShowingFavorites(false);
+    setSelectedResource(null);
+  };
+
+  const handleShowFavorites = () => {
+    setShowingFavorites(true);
+    setCurrentFolderId(null);
+    setSelectedResource(null);
+  };
+
+  const handleCreateFolder = async (name: string, parentId: string | null) => {
+    if (!user) return;
+    
+    const { error } = await supabase.from('resource_folders').insert({
+      name,
+      parent_id: parentId,
       user_id: user.id,
       campaign_id: activeCampaign?.id || null,
       is_global: !activeCampaign,
     });
-
+    
     if (error) {
       toast({ variant: 'destructive', title: 'Erro', description: error.message });
     } else {
-      toast({ title: 'Recurso adicionado!', description: `${formData.name} foi salvo na biblioteca.` });
-      setFormData({ name: '', description: '', type: 'image', file_url: '', tags: '' });
-      setIsDialogOpen(false);
-      loadResources();
+      toast({ title: 'Pasta criada!' });
+      loadData();
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteFolder = async (id: string) => {
+    const { error } = await supabase.from('resource_folders').delete().eq('id', id);
+    if (error) {
+      toast({ variant: 'destructive', title: 'Erro', description: error.message });
+    } else {
+      toast({ title: 'Pasta excluída' });
+      if (currentFolderId === id) setCurrentFolderId(null);
+      loadData();
+    }
+  };
+
+  const handleRenameFolder = async (id: string, name: string) => {
+    const { error } = await supabase.from('resource_folders').update({ name }).eq('id', id);
+    if (error) {
+      toast({ variant: 'destructive', title: 'Erro', description: error.message });
+    } else {
+      loadData();
+    }
+  };
+
+  const handleCreateResource = async (data: {
+    name: string;
+    description: string;
+    type: string;
+    file_url: string;
+    tags: string;
+  }) => {
+    if (!user) return;
+    
+    const { error } = await supabase.from('resources').insert({
+      name: data.name,
+      description: data.description || null,
+      type: data.type,
+      file_url: data.file_url || null,
+      tags: data.tags ? data.tags.split(',').map(t => t.trim()) : null,
+      folder_id: currentFolderId,
+      user_id: user.id,
+      campaign_id: activeCampaign?.id || null,
+      is_global: !activeCampaign,
+    });
+    
+    if (error) {
+      toast({ variant: 'destructive', title: 'Erro', description: error.message });
+    } else {
+      toast({ title: 'Recurso adicionado!' });
+      setIsAddDialogOpen(false);
+      loadData();
+    }
+  };
+
+  const handleToggleFavorite = async (id: string, isFavorite: boolean) => {
+    const { error } = await supabase.from('resources').update({ is_favorite: isFavorite }).eq('id', id);
+    if (error) {
+      toast({ variant: 'destructive', title: 'Erro', description: error.message });
+    } else {
+      setResources(prev => prev.map(r => r.id === id ? { ...r, is_favorite: isFavorite } : r));
+      if (selectedResource?.id === id) {
+        setSelectedResource(prev => prev ? { ...prev, is_favorite: isFavorite } : null);
+      }
+    }
+  };
+
+  const handleDeleteResource = async (id: string) => {
     const { error } = await supabase.from('resources').delete().eq('id', id);
     if (error) {
       toast({ variant: 'destructive', title: 'Erro', description: error.message });
     } else {
-      toast({ title: 'Recurso removido' });
-      loadResources();
+      toast({ title: 'Recurso excluído' });
+      if (selectedResource?.id === id) setSelectedResource(null);
+      loadData();
     }
   };
 
-  const filteredResources = resources.filter((r) => {
-    const matchesSearch = r.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.tags?.some(t => t.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesTab = activeTab === 'all' || r.type === activeTab;
-    return matchesSearch && matchesTab;
-  });
+  const handleMoveResource = async (folderId: string | null) => {
+    if (!resourceToMove) return;
+    
+    const { error } = await supabase.from('resources').update({ folder_id: folderId }).eq('id', resourceToMove);
+    if (error) {
+      toast({ variant: 'destructive', title: 'Erro', description: error.message });
+    } else {
+      toast({ title: 'Recurso movido!' });
+      setResourceToMove(null);
+      loadData();
+    }
+  };
 
-  const getTypeIcon = (type: string) => {
-    const found = resourceTypes.find(t => t.value === type);
-    return found ? found.icon : FileText;
+  const openMoveDialog = (id: string) => {
+    setResourceToMove(id);
+    setIsMoveDialogOpen(true);
   };
 
   return (
@@ -164,184 +269,93 @@ export default function Resources() {
               className="pl-9 w-64"
             />
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <Button onClick={() => setIsDialogOpen(true)} className="glow-gold">
-              <Plus className="w-4 h-4 mr-2" />
-              Adicionar Recurso
-            </Button>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle className="font-display">Adicionar Recurso</DialogTitle>
-                <DialogDescription>
-                  Salve imagens, documentos e outros recursos
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>Nome *</Label>
-                  <Input
-                    placeholder="Nome do recurso"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Tipo</Label>
-                  <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {resourceTypes.map((t) => (
-                        <SelectItem key={t.value} value={t.value}>
-                          <div className="flex items-center gap-2">
-                            <t.icon className="w-4 h-4" />
-                            {t.label}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>URL do Arquivo</Label>
-                  <Input
-                    placeholder="https://..."
-                    value={formData.file_url}
-                    onChange={(e) => setFormData({ ...formData, file_url: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Descrição</Label>
-                  <Textarea
-                    placeholder="Descrição do recurso..."
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    rows={2}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Tags (separadas por vírgula)</Label>
-                  <Input
-                    placeholder="mapa, cidade, fantasia..."
-                    value={formData.tags}
-                    onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-                <Button onClick={handleCreate}>Adicionar</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <Button onClick={() => setIsAddDialogOpen(true)} className="glow-gold">
+            <Plus className="w-4 h-4 mr-2" />
+            Adicionar Recurso
+          </Button>
         </div>
       }
     >
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="all">Todos</TabsTrigger>
-          <TabsTrigger value="image">Imagens</TabsTrigger>
-          <TabsTrigger value="map">Mapas</TabsTrigger>
-          <TabsTrigger value="token">Tokens</TabsTrigger>
-          <TabsTrigger value="document">Documentos</TabsTrigger>
-          <TabsTrigger value="audio">Áudio</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value={activeTab}>
-          {isLoading ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {[1, 2, 3, 4].map((i) => (
-                <Card key={i} className="animate-pulse">
-                  <div className="aspect-square bg-muted rounded-t-lg" />
-                  <CardContent className="p-4"><div className="h-4 bg-muted rounded w-3/4" /></CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : filteredResources.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex flex-col items-center justify-center py-16 text-center"
+      <div className="flex h-[calc(100vh-8rem)] -m-6 bg-background">
+        {/* Folder Tree Sidebar */}
+        <FolderTree
+          folders={folderTree}
+          currentFolderId={currentFolderId}
+          onFolderSelect={handleFolderSelect}
+          onShowFavorites={handleShowFavorites}
+          showingFavorites={showingFavorites}
+          onCreateFolder={handleCreateFolder}
+          onDeleteFolder={handleDeleteFolder}
+          onRenameFolder={handleRenameFolder}
+        />
+        
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Breadcrumb */}
+          <div className="h-10 border-b border-border/50 flex items-center px-4 gap-1 text-sm bg-card/30">
+            <button
+              onClick={() => handleFolderSelect(null)}
+              className="hover:text-primary transition-colors flex items-center gap-1"
             >
-              <FolderOpen className="w-16 h-16 text-muted-foreground mb-4" />
-              <h3 className="font-display text-xl font-bold mb-2">
-                {searchTerm ? 'Nenhum recurso encontrado' : 'Biblioteca Vazia'}
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                {searchTerm ? 'Tente outra busca' : 'Comece adicionando imagens, mapas e outros recursos'}
-              </p>
-              {!searchTerm && (
-                <Button onClick={() => setIsDialogOpen(true)}>
-                  <Upload className="w-4 h-4 mr-2" />
-                  Adicionar Primeiro Recurso
-                </Button>
-              )}
-            </motion.div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredResources.map((resource, index) => {
-                const TypeIcon = getTypeIcon(resource.type);
-                return (
-                  <motion.div
-                    key={resource.id}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: index * 0.03 }}
-                  >
-                    <Card className="overflow-hidden hover:border-primary/50 transition-all group">
-                      <div className="aspect-square bg-muted relative flex items-center justify-center">
-                        {resource.file_url && (resource.type === 'image' || resource.type === 'token' || resource.type === 'map') ? (
-                          <img
-                            src={resource.file_url}
-                            alt={resource.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <TypeIcon className="w-16 h-16 text-muted-foreground" />
-                        )}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              size="icon"
-                              className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {resource.file_url && (
-                              <DropdownMenuItem asChild>
-                                <a href={resource.file_url} target="_blank" rel="noopener noreferrer">
-                                  <ExternalLink className="w-4 h-4 mr-2" />Abrir
-                                </a>
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(resource.id)}>
-                              <Trash2 className="w-4 h-4 mr-2" />Excluir
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                      <CardContent className="p-4">
-                        <h4 className="font-medium truncate">{resource.name}</h4>
-                        {resource.tags && resource.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {resource.tags.slice(0, 3).map((tag) => (
-                              <Badge key={tag} variant="secondary" className="text-xs">
-                                {tag}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                );
-              })}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+              <Home className="w-4 h-4" />
+              <span>Raiz</span>
+            </button>
+            {breadcrumbPath.map((folder) => (
+              <div key={folder.id} className="flex items-center gap-1">
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                <button
+                  onClick={() => handleFolderSelect(folder.id)}
+                  className="hover:text-primary transition-colors"
+                >
+                  {folder.name}
+                </button>
+              </div>
+            ))}
+            {showingFavorites && (
+              <>
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                <span className="text-primary">Favoritos</span>
+              </>
+            )}
+          </div>
+          
+          {/* Resource Grid */}
+          <div className="flex-1 overflow-auto">
+            <ResourceGrid
+              resources={filteredResources}
+              selectedId={selectedResource?.id || null}
+              onSelect={setSelectedResource}
+              onToggleFavorite={handleToggleFavorite}
+              onDelete={handleDeleteResource}
+              onMoveToFolder={openMoveDialog}
+              isLoading={isLoading}
+            />
+          </div>
+        </div>
+        
+        {/* Preview Panel */}
+        <ResourcePreview
+          resource={selectedResource}
+          onClose={() => setSelectedResource(null)}
+          onToggleFavorite={handleToggleFavorite}
+          onDelete={handleDeleteResource}
+          onMoveToFolder={openMoveDialog}
+        />
+      </div>
+      
+      {/* Dialogs */}
+      <AddResourceDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onSubmit={handleCreateResource}
+      />
+      
+      <MoveToFolderDialog
+        open={isMoveDialogOpen}
+        onOpenChange={setIsMoveDialogOpen}
+        folders={folderTree}
+        onMove={handleMoveResource}
+      />
     </AppLayout>
   );
 }
