@@ -57,6 +57,20 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        gold: {
+          DEFAULT: "hsl(var(--gold))",
+          foreground: "hsl(var(--gold-foreground))",
+        },
+        parchment: "hsl(var(--parchment))",
+        ink: "hsl(var(--ink))",
+        blood: "hsl(var(--blood))",
+        forest: "hsl(var(--forest))",
+        arcane: "hsl(var(--arcane))",
+        steel: "hsl(var(--steel))",
+      },
+      fontFamily: {
+        display: ['Cinzel', 'serif'],
+        serif: ['Crimson Text', 'serif'],
       },
       borderRadius: {
         lg: "var(--radius)",
