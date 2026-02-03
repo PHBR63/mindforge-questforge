@@ -36,7 +36,6 @@ import { MapAsset } from '@/components/maps/assetTypes';
 import { MapDrawing, MapLayer, DrawingState, DrawingTool, DEFAULT_LAYERS } from '@/components/maps/drawingTypes';
 import { WallEditor } from '@/components/maps/WallEditor';
 import { Model3DLibrary } from '@/components/maps/Model3DLibrary';
-import { Models3DRenderer } from '@/components/maps/Models3DRenderer';
 import { Map3DModel } from '@/components/maps/model3DTypes';
 import { Plus, Map, AlertCircle, Trash2, Grid3X3, Box, Sun, Moon, Flame, Package, Paintbrush, Layers, Columns, Boxes } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -924,22 +923,38 @@ export default function MapBuilder() {
                     tokens={tokens}
                     assets={assets}
                     drawings={drawings}
+                    models3D={models3D}
                     selectedTokenId={selectedTokenId}
                     selectedAssetId={selectedAssetId}
+                    selectedModel3DId={selectedModel3DId}
                     drawingState={drawingState}
                     onTokenMove={handleTokenMove}
                     onTokenSelect={(id) => {
                       setSelectedTokenId(id);
-                      if (id) setSelectedAssetId(null);
+                      if (id) {
+                        setSelectedAssetId(null);
+                        setSelectedModel3DId(null);
+                      }
                     }}
                     onAssetSelect={(id) => {
                       setSelectedAssetId(id);
-                      if (id) setSelectedTokenId(null);
+                      if (id) {
+                        setSelectedTokenId(null);
+                        setSelectedModel3DId(null);
+                      }
+                    }}
+                    onModel3DSelect={(id) => {
+                      setSelectedModel3DId(id);
+                      if (id) {
+                        setSelectedTokenId(null);
+                        setSelectedAssetId(null);
+                      }
                     }}
                     onAssetMove={handleAssetMove}
                     onCellClick={(x, y) => console.log('Cell clicked:', x, y)}
                     onAssetDrop={handleAssetPlace}
                     onDrawingComplete={handleDrawingComplete}
+                    onSwitchTo3D={() => setViewMode('3d')}
                   />
                 ) : (
                   <MapScene3D
@@ -951,8 +966,15 @@ export default function MapBuilder() {
                     models3D={models3D}
                     selectedTokenId={selectedTokenId}
                     selectedModel3DId={selectedModel3DId}
-                    onTokenSelect={setSelectedTokenId}
-                    onModel3DSelect={setSelectedModel3DId}
+                    onTokenSelect={(id) => {
+                      setSelectedTokenId(id);
+                      if (id) setSelectedModel3DId(null);
+                    }}
+                    onModel3DSelect={(id) => {
+                      setSelectedModel3DId(id);
+                      if (id) setSelectedTokenId(null);
+                    }}
+                    onModel3DUpdate={handleModel3DUpdate}
                     environment={environment3D}
                   />
                 )}

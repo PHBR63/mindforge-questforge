@@ -1,16 +1,16 @@
-import { Suspense, useRef } from 'react';
+import { Suspense, useRef, useEffect, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { 
   OrbitControls, 
   PerspectiveCamera, 
-  Environment, 
   ContactShadows,
   Stars,
   Sky
 } from '@react-three/drei';
 import { Grid3D } from './Grid3D';
 import { Token3D } from './Token3D';
-import { Models3DRenderer } from './Models3DRenderer';
+import { TransformableModel3D, ModelLoadingFallback } from './TransformableModel3D';
+import { Transform3DToolbar, TransformMode } from './Transform3DToolbar';
 import { MapToken } from './types';
 import { Map3DModel } from './model3DTypes';
 
@@ -25,7 +25,12 @@ interface MapScene3DProps {
   selectedModel3DId?: string | null;
   onTokenSelect: (tokenId: string | null) => void;
   onModel3DSelect?: (modelId: string | null) => void;
+  onModel3DUpdate?: (modelId: string, updates: Partial<Map3DModel>) => void;
   environment?: 'day' | 'night' | 'dungeon';
+}
+
+interface SceneProps extends MapScene3DProps {
+  transformMode: TransformMode;
 }
 
 function Scene({
@@ -39,10 +44,14 @@ function Scene({
   selectedModel3DId,
   onTokenSelect,
   onModel3DSelect,
+  onModel3DUpdate,
   environment = 'dungeon',
-}: MapScene3DProps) {
+  transformMode,
+}: SceneProps) {
   const totalWidth = gridWidth * cellSize;
   const totalHeight = gridHeight * cellSize;
+  
+  const visibleModels = models3D.filter((m) => m.is_visible);
   
   return (
     <>
@@ -53,7 +62,7 @@ function Scene({
         fov={50}
       />
       
-      {/* Controls */}
+      {/* Controls - disabled when transforming */}
       <OrbitControls 
         enablePan={true}
         enableZoom={true}
@@ -61,6 +70,7 @@ function Scene({
         minDistance={5}
         maxDistance={totalWidth * 2}
         maxPolarAngle={Math.PI / 2 - 0.1}
+        enabled={!selectedModel3DId}
       />
       
       {/* Lighting based on environment */}
@@ -100,7 +110,10 @@ function Scene({
         rotation={[-Math.PI / 2, 0, 0]} 
         position={[0, -0.01, 0]} 
         receiveShadow
-        onClick={() => onTokenSelect(null)}
+        onClick={() => {
+          onTokenSelect(null);
+          onModel3DSelect?.(null);
+        }}
       >
         <planeGeometry args={[totalWidth + 4, totalHeight + 4]} />
         <meshStandardMaterial 
@@ -127,21 +140,33 @@ function Scene({
           gridHeight={gridHeight}
           cellSize={cellSize}
           isSelected={selectedTokenId === token.id}
-          onClick={() => onTokenSelect(token.id)}
+          onClick={() => {
+            onTokenSelect(token.id);
+            onModel3DSelect?.(null);
+          }}
         />
       ))}
 
-      {/* 3D Models */}
-      {models3D.length > 0 && (
-        <Models3DRenderer
-          models={models3D}
-          cellSize={cellSize}
-          selectedModelId={selectedModel3DId || null}
-          onModelSelect={onModel3DSelect || (() => {})}
-          gridWidth={gridWidth}
-          gridHeight={gridHeight}
-        />
-      )}
+      {/* 3D Models with TransformControls */}
+      {visibleModels.map((model) => (
+        <Suspense key={model.id} fallback={<ModelLoadingFallback />}>
+          <TransformableModel3D
+            model={model}
+            cellSize={cellSize}
+            gridWidth={gridWidth}
+            gridHeight={gridHeight}
+            isSelected={selectedModel3DId === model.id}
+            transformMode={transformMode}
+            onSelect={() => {
+              onModel3DSelect?.(model.id);
+              onTokenSelect(null);
+            }}
+            onTransformEnd={(updates) => {
+              onModel3DUpdate?.(model.id, updates);
+            }}
+          />
+        </Suspense>
+      ))}
       
       {/* Contact shadows */}
       <ContactShadows 
@@ -156,11 +181,48 @@ function Scene({
 }
 
 export function MapScene3D(props: MapScene3DProps) {
+  const [transformMode, setTransformMode] = useState<TransformMode>('translate');
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      
+      switch (e.key.toLowerCase()) {
+        case 'g':
+          setTransformMode('translate');
+          break;
+        case 'r':
+          setTransformMode('rotate');
+          break;
+        case 's':
+          setTransformMode('scale');
+          break;
+        case 'escape':
+          props.onModel3DSelect?.(null);
+          props.onTokenSelect(null);
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [props]);
+
   return (
-    <div className="w-full h-full rounded-lg overflow-hidden border border-border">
+    <div className="relative w-full h-full rounded-lg overflow-hidden border border-border">
+      {/* Transform toolbar */}
+      <div className="absolute top-3 left-3 z-10">
+        <Transform3DToolbar
+          mode={transformMode}
+          onModeChange={setTransformMode}
+          hasSelection={!!props.selectedModel3DId}
+        />
+      </div>
+
       <Canvas shadows>
         <Suspense fallback={null}>
-          <Scene {...props} />
+          <Scene {...props} transformMode={transformMode} />
         </Suspense>
       </Canvas>
     </div>
