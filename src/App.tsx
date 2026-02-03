@@ -12,6 +12,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Campaigns from "./pages/Campaigns";
 import MindMap from "./pages/MindMap";
+import MapBuilder from "./pages/MapBuilder";
 import NPCs from "./pages/NPCs";
 import Locations from "./pages/Locations";
 import Factions from "./pages/Factions";
@@ -68,6 +69,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <MindMap />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/map-builder"
+        element={
+          <ProtectedRoute>
+            <MapBuilder />
           </ProtectedRoute>
         }
       />

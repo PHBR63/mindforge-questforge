@@ -26,11 +26,13 @@ import {
   Swords,
   LogOut,
   Settings,
+  Grid3X3,
 } from 'lucide-react';
 
 const mainNavItems = [
   { icon: Scroll, label: 'Campanhas', href: '/campaigns' },
   { icon: Map, label: 'Mapa Mental', href: '/mind-map' },
+  { icon: Grid3X3, label: 'Mapas 2D', href: '/map-builder' },
   { icon: Users, label: 'NPCs', href: '/npcs' },
   { icon: MapPin, label: 'Locais', href: '/locations' },
   { icon: Shield, label: 'Facções', href: '/factions' },
