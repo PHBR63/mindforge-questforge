@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { ImageUpload } from '@/components/ui/image-upload';
 import { Plus, MapPin, Search, AlertCircle, MoreVertical, Trash2, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -58,6 +59,7 @@ export default function Locations() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     name: '',
@@ -67,6 +69,7 @@ export default function Locations() {
     government: '',
     notable_features: '',
     secrets: '',
+    image_url: null as string | null,
   });
 
   useEffect(() => {
@@ -94,25 +97,61 @@ export default function Locations() {
     setIsLoading(false);
   };
 
-  const handleCreate = async () => {
+  const resetForm = () => {
+    setFormData({
+      name: '', description: '', type: 'Cidade', population: '',
+      government: '', notable_features: '', secrets: '', image_url: null,
+    });
+    setEditingLocation(null);
+  };
+
+  const openEditDialog = (location: Location) => {
+    setEditingLocation(location);
+    setFormData({
+      name: location.name,
+      description: location.description || '',
+      type: location.type || 'Cidade',
+      population: location.population || '',
+      government: location.government || '',
+      notable_features: location.notable_features || '',
+      secrets: location.secrets || '',
+      image_url: location.image_url,
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleSubmit = async () => {
     if (!formData.name.trim() || !activeCampaign || !user) return;
 
-    const { error } = await supabase.from('locations').insert({
-      ...formData,
-      campaign_id: activeCampaign.id,
-      user_id: user.id,
-    });
+    if (editingLocation) {
+      const { error } = await supabase
+        .from('locations')
+        .update(formData)
+        .eq('id', editingLocation.id);
 
-    if (error) {
-      toast({ variant: 'destructive', title: 'Erro', description: error.message });
+      if (error) {
+        toast({ variant: 'destructive', title: 'Erro', description: error.message });
+      } else {
+        toast({ title: 'Local atualizado!', description: `${formData.name} foi salvo.` });
+        resetForm();
+        setIsDialogOpen(false);
+        loadLocations();
+      }
     } else {
-      toast({ title: 'Local criado!', description: `${formData.name} foi adicionado.` });
-      setFormData({
-        name: '', description: '', type: 'Cidade', population: '',
-        government: '', notable_features: '', secrets: '',
+      const { error } = await supabase.from('locations').insert({
+        ...formData,
+        campaign_id: activeCampaign.id,
+        user_id: user.id,
       });
-      setIsDialogOpen(false);
-      loadLocations();
+
+      if (error) {
+        toast({ variant: 'destructive', title: 'Erro', description: error.message });
+      } else {
+        toast({ title: 'Local criado!', description: `${formData.name} foi adicionado.` });
+        resetForm();
+        setIsDialogOpen(false);
+        loadLocations();
+      }
     }
   };
 
@@ -164,19 +203,38 @@ export default function Locations() {
               className="pl-9 w-64"
             />
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <Button onClick={() => setIsDialogOpen(true)} className="glow-gold">
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) resetForm();
+          }}>
+            <Button onClick={() => {
+              resetForm();
+              setIsDialogOpen(true);
+            }} className="glow-gold">
               <Plus className="w-4 h-4 mr-2" />
               Novo Local
             </Button>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle className="font-display">Criar Local</DialogTitle>
+                <DialogTitle className="font-display">
+                  {editingLocation ? 'Editar Local' : 'Criar Local'}
+                </DialogTitle>
                 <DialogDescription>
-                  Adicione um novo local ao seu mundo
+                  {editingLocation ? 'Atualize as informações do local' : 'Adicione um novo local ao seu mundo'}
                 </DialogDescription>
               </DialogHeader>
               <div className="grid grid-cols-2 gap-4 py-4">
+                {/* Image Upload */}
+                <div className="col-span-2">
+                  <ImageUpload
+                    value={formData.image_url}
+                    onChange={(url) => setFormData({ ...formData, image_url: url })}
+                    label="Imagem do Local"
+                    placeholder="Arraste uma imagem ou clique para selecionar"
+                    aspectRatio="landscape"
+                    resourceType="location"
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label>Nome *</Label>
                   <Input
@@ -241,8 +299,13 @@ export default function Locations() {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-                <Button onClick={handleCreate}>Criar Local</Button>
+                <Button variant="outline" onClick={() => {
+                  setIsDialogOpen(false);
+                  resetForm();
+                }}>Cancelar</Button>
+                <Button onClick={handleSubmit}>
+                  {editingLocation ? 'Salvar' : 'Criar Local'}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -287,7 +350,12 @@ export default function Locations() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
             >
-              <Card className="h-full hover:border-primary/50 transition-all">
+              <Card className="h-full hover:border-primary/50 transition-all overflow-hidden">
+                {location.image_url && (
+                  <div className="h-32 overflow-hidden">
+                    <img src={location.image_url} alt={location.name} className="w-full h-full object-cover" />
+                  </div>
+                )}
                 <CardHeader className="flex flex-row items-start justify-between">
                   <div>
                     <CardTitle className="font-display text-lg">{location.name}</CardTitle>
@@ -302,7 +370,9 @@ export default function Locations() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem><Edit className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openEditDialog(location)}>
+                        <Edit className="w-4 h-4 mr-2" />Editar
+                      </DropdownMenuItem>
                       <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(location.id)}>
                         <Trash2 className="w-4 h-4 mr-2" />Excluir
                       </DropdownMenuItem>

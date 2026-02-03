@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { ImageUpload } from '@/components/ui/image-upload';
 import { Plus, Shield, Search, AlertCircle, MoreVertical, Trash2, Edit, Users, Target, Handshake, Swords } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -55,6 +56,7 @@ export default function Factions() {
     goals: '',
     allies: '',
     enemies: '',
+    symbol_url: null as string | null,
   });
 
   useEffect(() => {
@@ -91,6 +93,7 @@ export default function Factions() {
       goals: '',
       allies: '',
       enemies: '',
+      symbol_url: null,
     });
     setEditingFaction(null);
   };
@@ -105,6 +108,7 @@ export default function Factions() {
       goals: faction.goals || '',
       allies: faction.allies || '',
       enemies: faction.enemies || '',
+      symbol_url: faction.symbol_url,
     });
     setIsDialogOpen(true);
   };
@@ -213,6 +217,17 @@ export default function Factions() {
                 </DialogDescription>
               </DialogHeader>
               <div className="grid grid-cols-2 gap-4 py-4">
+                {/* Symbol Upload */}
+                <div className="col-span-2">
+                  <ImageUpload
+                    value={formData.symbol_url}
+                    onChange={(url) => setFormData({ ...formData, symbol_url: url })}
+                    label="Símbolo/Brasão da Facção"
+                    placeholder="Arraste uma imagem ou clique para selecionar"
+                    aspectRatio="square"
+                    resourceType="faction"
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label>Nome *</Label>
                   <Input
