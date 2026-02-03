@@ -327,6 +327,83 @@ export type Database = {
           },
         ]
       }
+      map_3d_models: {
+        Row: {
+          animation_name: string | null
+          animation_playing: boolean | null
+          created_at: string
+          file_url: string
+          id: string
+          is_visible: boolean | null
+          layer: number | null
+          map_id: string
+          metadata: Json | null
+          name: string
+          position_x: number
+          position_y: number
+          position_z: number
+          rotation_x: number
+          rotation_y: number
+          rotation_z: number
+          scale: number
+          thumbnail_url: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          animation_name?: string | null
+          animation_playing?: boolean | null
+          created_at?: string
+          file_url: string
+          id?: string
+          is_visible?: boolean | null
+          layer?: number | null
+          map_id: string
+          metadata?: Json | null
+          name: string
+          position_x?: number
+          position_y?: number
+          position_z?: number
+          rotation_x?: number
+          rotation_y?: number
+          rotation_z?: number
+          scale?: number
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          animation_name?: string | null
+          animation_playing?: boolean | null
+          created_at?: string
+          file_url?: string
+          id?: string
+          is_visible?: boolean | null
+          layer?: number | null
+          map_id?: string
+          metadata?: Json | null
+          name?: string
+          position_x?: number
+          position_y?: number
+          position_z?: number
+          rotation_x?: number
+          rotation_y?: number
+          rotation_z?: number
+          scale?: number
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "map_3d_models_map_id_fkey"
+            columns: ["map_id"]
+            isOneToOne: false
+            referencedRelation: "maps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       map_assets: {
         Row: {
           asset_key: string

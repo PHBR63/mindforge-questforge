@@ -10,7 +10,9 @@ import {
 } from '@react-three/drei';
 import { Grid3D } from './Grid3D';
 import { Token3D } from './Token3D';
+import { Models3DRenderer } from './Models3DRenderer';
 import { MapToken } from './types';
+import { Map3DModel } from './model3DTypes';
 
 interface MapScene3DProps {
   gridWidth: number;
@@ -18,8 +20,11 @@ interface MapScene3DProps {
   cellSize: number;
   backgroundColor: string;
   tokens: MapToken[];
+  models3D?: Map3DModel[];
   selectedTokenId: string | null;
+  selectedModel3DId?: string | null;
   onTokenSelect: (tokenId: string | null) => void;
+  onModel3DSelect?: (modelId: string | null) => void;
   environment?: 'day' | 'night' | 'dungeon';
 }
 
@@ -29,8 +34,11 @@ function Scene({
   cellSize,
   backgroundColor,
   tokens,
+  models3D = [],
   selectedTokenId,
+  selectedModel3DId,
   onTokenSelect,
+  onModel3DSelect,
   environment = 'dungeon',
 }: MapScene3DProps) {
   const totalWidth = gridWidth * cellSize;
@@ -122,6 +130,18 @@ function Scene({
           onClick={() => onTokenSelect(token.id)}
         />
       ))}
+
+      {/* 3D Models */}
+      {models3D.length > 0 && (
+        <Models3DRenderer
+          models={models3D}
+          cellSize={cellSize}
+          selectedModelId={selectedModel3DId || null}
+          onModelSelect={onModel3DSelect || (() => {})}
+          gridWidth={gridWidth}
+          gridHeight={gridHeight}
+        />
+      )}
       
       {/* Contact shadows */}
       <ContactShadows 
