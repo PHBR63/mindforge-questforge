@@ -4,6 +4,7 @@ import { MapAsset, getAssetByKey } from './assetTypes';
 import { MapDrawing, DrawingState, DrawingTool, DrawingPoint } from './drawingTypes';
 import { Map3DModel } from './model3DTypes';
 import { Model3DOverlay } from './Model3DPlaceholder';
+import { type PlacedTile, getTileById } from './tilesets';
 
 interface DrawableMapGridProps {
   gridWidth: number;
@@ -29,6 +30,12 @@ interface DrawableMapGridProps {
   onDrawingComplete?: (drawing: Omit<MapDrawing, 'id' | 'map_id' | 'user_id' | 'created_at' | 'updated_at'>) => void;
   onFloodFill?: (x: number, y: number, color: string) => void;
   onSwitchTo3D?: () => void;
+  // Tileset props
+  placedTiles?: PlacedTile[];
+  selectedTileInstanceId?: string | null;
+  onTileSelect?: (id: string | null) => void;
+  onTileMove?: (id: string, x: number, y: number) => void;
+  onTileDrop?: (tileId: string, x: number, y: number) => void;
 }
 
 export interface DrawableMapGridRef {
@@ -59,6 +66,11 @@ export const DrawableMapGrid = forwardRef<DrawableMapGridRef, DrawableMapGridPro
   onDrawingComplete,
   onFloodFill,
   onSwitchTo3D,
+  placedTiles = [],
+  selectedTileInstanceId,
+  onTileSelect,
+  onTileMove,
+  onTileDrop,
 }, ref) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawingCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -77,6 +89,36 @@ export const DrawableMapGrid = forwardRef<DrawableMapGridRef, DrawableMapGridPro
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentPoints, setCurrentPoints] = useState<DrawingPoint[]>([]);
   const [shapeStart, setShapeStart] = useState<DrawingPoint | null>(null);
+  const [tileImages, setTileImages] = useState<Map<string, HTMLImageElement>>(new Map());
+
+  // Preload tile images
+  useEffect(() => {
+    const uniqueTileIds = [...new Set(placedTiles.map(t => t.tileId))];
+    const imagesToLoad = uniqueTileIds.filter(id => !tileImages.has(id));
+    
+    if (imagesToLoad.length === 0) return;
+    
+    const loadImages = async () => {
+      const newImages = new Map(tileImages);
+      
+      await Promise.all(imagesToLoad.map(async (tileId) => {
+        const tileDef = getTileById(tileId);
+        if (!tileDef) return;
+        
+        const img = new Image();
+        img.src = tileDef.imageData;
+        await new Promise<void>((resolve) => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+        });
+        newImages.set(tileId, img);
+      }));
+      
+      setTileImages(newImages);
+    };
+    
+    loadImages();
+  }, [placedTiles]);
 
   const width = gridWidth * cellSize;
   const height = gridHeight * cellSize;
@@ -100,6 +142,42 @@ export const DrawableMapGrid = forwardRef<DrawableMapGridRef, DrawableMapGridPro
     for (const drawing of drawings) {
       if (!drawing.is_visible) continue;
       drawDrawingPath(ctx, drawing);
+    }
+
+    // Draw placed tiles (below grid for visibility)
+    for (const tile of placedTiles) {
+      if (!tile.isVisible) continue;
+      
+      const tileDef = getTileById(tile.tileId);
+      const tileImg = tileImages.get(tile.tileId);
+      if (!tileDef) continue;
+      
+      const tileSize = tileDef.size * cellSize * tile.scale;
+      const x = tile.x * cellSize;
+      const y = tile.y * cellSize;
+      
+      ctx.save();
+      ctx.translate(x + tileSize / 2, y + tileSize / 2);
+      ctx.rotate((tile.rotation * Math.PI) / 180);
+      
+      if (tileImg && tileImg.complete) {
+        ctx.drawImage(tileImg, -tileSize / 2, -tileSize / 2, tileSize, tileSize);
+      } else {
+        // Fallback placeholder
+        ctx.fillStyle = '#555';
+        ctx.fillRect(-tileSize / 2, -tileSize / 2, tileSize, tileSize);
+      }
+      
+      // Selection highlight
+      if (selectedTileInstanceId === tile.id) {
+        ctx.strokeStyle = '#22c55e';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 3]);
+        ctx.strokeRect(-tileSize / 2, -tileSize / 2, tileSize, tileSize);
+        ctx.setLineDash([]);
+      }
+      
+      ctx.restore();
     }
 
     // Draw grid lines
@@ -193,7 +271,7 @@ export const DrawableMapGrid = forwardRef<DrawableMapGridRef, DrawableMapGridPro
         y + tokenSize / 2
       );
     }
-  }, [gridWidth, gridHeight, cellSize, backgroundColor, tokens, assets, drawings, selectedTokenId, selectedAssetId, width, height]);
+  }, [gridWidth, gridHeight, cellSize, backgroundColor, tokens, assets, drawings, selectedTokenId, selectedAssetId, placedTiles, selectedTileInstanceId, tileImages, width, height]);
 
   const drawDrawingPath = (ctx: CanvasRenderingContext2D, drawing: MapDrawing) => {
     if (drawing.points.length === 0) return;
@@ -507,8 +585,16 @@ export const DrawableMapGrid = forwardRef<DrawableMapGridRef, DrawableMapGridPro
     e.preventDefault();
     try {
       const data = JSON.parse(e.dataTransfer.getData('application/json'));
+      const pos = getGridPosition(e.clientX, e.clientY);
+      
+      // Handle tileset tile drop
+      if (data.type === 'tileset-tile' && data.tileId && onTileDrop) {
+        onTileDrop(data.tileId, pos.x, pos.y);
+        return;
+      }
+      
+      // Handle asset drop
       if (data.assetKey && onAssetDrop) {
-        const pos = getGridPosition(e.clientX, e.clientY);
         onAssetDrop(data.assetKey, data.category, pos.x, pos.y);
       }
     } catch (err) {
