@@ -26,7 +26,7 @@ interface DrawableMapGridProps {
   onModel3DSelect?: (modelId: string | null) => void;
   onModel3DMove?: (modelId: string, x: number, y: number) => void;
   onCellClick: (x: number, y: number) => void;
-  onAssetDrop?: (assetKey: string, category: string, x: number, y: number) => void;
+  onAssetDrop?: (assetKey: string, category: string, x: number, y: number, customImageUrl?: string, name?: string) => void;
   onDrawingComplete?: (drawing: Omit<MapDrawing, 'id' | 'map_id' | 'user_id' | 'created_at' | 'updated_at'>) => void;
   onFloodFill?: (x: number, y: number, color: string) => void;
   onSwitchTo3D?: () => void;
@@ -90,6 +90,7 @@ export const DrawableMapGrid = forwardRef<DrawableMapGridRef, DrawableMapGridPro
   const [currentPoints, setCurrentPoints] = useState<DrawingPoint[]>([]);
   const [shapeStart, setShapeStart] = useState<DrawingPoint | null>(null);
   const [tileImages, setTileImages] = useState<Map<string, HTMLImageElement>>(new Map());
+  const [assetImages, setAssetImages] = useState<Map<string, HTMLImageElement>>(new Map());
 
   // Preload tile images
   useEffect(() => {
@@ -119,6 +120,35 @@ export const DrawableMapGrid = forwardRef<DrawableMapGridRef, DrawableMapGridPro
     
     loadImages();
   }, [placedTiles]);
+
+  // Preload custom asset images
+  useEffect(() => {
+    const assetsWithImages = assets.filter(a => a.custom_image_url);
+    const imagesToLoad = assetsWithImages.filter(a => !assetImages.has(a.id));
+    
+    if (imagesToLoad.length === 0) return;
+    
+    const loadImages = async () => {
+      const newImages = new Map(assetImages);
+      
+      await Promise.all(imagesToLoad.map(async (asset) => {
+        if (!asset.custom_image_url) return;
+        
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.src = asset.custom_image_url;
+        await new Promise<void>((resolve) => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+        });
+        newImages.set(asset.id, img);
+      }));
+      
+      setAssetImages(newImages);
+    };
+    
+    loadImages();
+  }, [assets]);
 
   const width = gridWidth * cellSize;
   const height = gridHeight * cellSize;
@@ -205,6 +235,33 @@ export const DrawableMapGrid = forwardRef<DrawableMapGridRef, DrawableMapGridPro
       if (!asset.is_visible) continue;
       
       const assetDef = getAssetByKey(asset.asset_key);
+      const customImg = assetImages.get(asset.id);
+      
+      // For custom image assets (from cache)
+      if (asset.custom_image_url && customImg && customImg.complete) {
+        const assetSize = cellSize * (asset.scale || 1);
+        const x = asset.position_x * cellSize;
+        const y = asset.position_y * cellSize;
+        
+        ctx.save();
+        ctx.translate(x + assetSize / 2, y + assetSize / 2);
+        ctx.rotate((asset.rotation || 0) * Math.PI / 180);
+        
+        ctx.drawImage(customImg, -assetSize / 2, -assetSize / 2, assetSize, assetSize);
+        
+        if (selectedAssetId === asset.id) {
+          ctx.strokeStyle = '#22c55e';
+          ctx.lineWidth = 3;
+          ctx.setLineDash([4, 4]);
+          ctx.strokeRect(-assetSize / 2, -assetSize / 2, assetSize, assetSize);
+          ctx.setLineDash([]);
+        }
+        
+        ctx.restore();
+        continue;
+      }
+      
+      // For predefined assets (emoji icons)
       if (!assetDef) continue;
       
       const assetSize = (assetDef.size || 1) * cellSize * (asset.scale || 1);
@@ -271,7 +328,7 @@ export const DrawableMapGrid = forwardRef<DrawableMapGridRef, DrawableMapGridPro
         y + tokenSize / 2
       );
     }
-  }, [gridWidth, gridHeight, cellSize, backgroundColor, tokens, assets, drawings, selectedTokenId, selectedAssetId, placedTiles, selectedTileInstanceId, tileImages, width, height]);
+  }, [gridWidth, gridHeight, cellSize, backgroundColor, tokens, assets, drawings, selectedTokenId, selectedAssetId, placedTiles, selectedTileInstanceId, tileImages, assetImages, width, height]);
 
   const drawDrawingPath = (ctx: CanvasRenderingContext2D, drawing: MapDrawing) => {
     if (drawing.points.length === 0) return;
@@ -593,7 +650,13 @@ export const DrawableMapGrid = forwardRef<DrawableMapGridRef, DrawableMapGridPro
         return;
       }
       
-      // Handle asset drop
+      // Handle cached asset drop (from Forgotten Adventures cache)
+      if (data.type === 'cached-asset' && data.thumbnailUrl && onAssetDrop) {
+        onAssetDrop(data.assetKey, data.category, pos.x, pos.y, data.thumbnailUrl, data.name);
+        return;
+      }
+      
+      // Handle standard asset drop
       if (data.assetKey && onAssetDrop) {
         onAssetDrop(data.assetKey, data.category, pos.x, pos.y);
       }
