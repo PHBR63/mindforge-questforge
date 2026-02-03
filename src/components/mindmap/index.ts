@@ -4,4 +4,5 @@ export { NodeDialog } from './NodeDialog';
 export { ConnectionDialog } from './ConnectionDialog';
 export { EntityImportDialog } from './EntityImportDialog';
 export { MindMapToolbar } from './MindMapToolbar';
+export { ExportDialog } from './ExportDialog';
 export * from './types';

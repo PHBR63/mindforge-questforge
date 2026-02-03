@@ -5,26 +5,30 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Plus, Save, Import, ZoomIn, ZoomOut, Maximize2, Keyboard } from 'lucide-react';
+import { Plus, Save, Import, ZoomIn, ZoomOut, Maximize2, Keyboard, Download } from 'lucide-react';
 
 interface MindMapToolbarProps {
   onAddNode: () => void;
   onSaveLayout: () => void;
   onImportEntities: () => void;
+  onExport: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onFitView: () => void;
   isSaving: boolean;
+  hasNodes: boolean;
 }
 
 export function MindMapToolbar({
   onAddNode,
   onSaveLayout,
   onImportEntities,
+  onExport,
   onZoomIn,
   onZoomOut,
   onFitView,
   isSaving,
+  hasNodes,
 }: MindMapToolbarProps) {
   return (
     <TooltipProvider>
@@ -80,7 +84,12 @@ export function MindMapToolbar({
           Importar
         </Button>
 
-        <Button variant="outline" onClick={onSaveLayout} disabled={isSaving}>
+        <Button variant="outline" onClick={onExport} disabled={!hasNodes}>
+          <Download className="w-4 h-4 mr-2" />
+          Exportar
+        </Button>
+
+        <Button variant="outline" onClick={onSaveLayout} disabled={isSaving || !hasNodes}>
           <Save className="w-4 h-4 mr-2" />
           {isSaving ? 'Salvando...' : 'Salvar Layout'}
         </Button>
