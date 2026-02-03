@@ -26,6 +26,7 @@ interface MapScene3DProps {
   onTokenSelect: (tokenId: string | null) => void;
   onModel3DSelect?: (modelId: string | null) => void;
   onModel3DUpdate?: (modelId: string, updates: Partial<Map3DModel>) => void;
+  onModel3DDuplicate?: (modelId: string) => void;
   environment?: 'day' | 'night' | 'dungeon';
 }
 
@@ -200,10 +201,19 @@ export function MapScene3D(props: MapScene3DProps) {
           setTransformMode('rotate');
           break;
         case 's':
-          setTransformMode('scale');
+          if (!e.ctrlKey && !e.metaKey) {
+            setTransformMode('scale');
+          }
           break;
         case 'x':
           setSnapToGrid((prev) => !prev);
+          break;
+        case 'd':
+          // Ctrl+D to duplicate selected model
+          if ((e.ctrlKey || e.metaKey) && props.selectedModel3DId) {
+            e.preventDefault();
+            props.onModel3DDuplicate?.(props.selectedModel3DId);
+          }
           break;
         case 'escape':
           props.onModel3DSelect?.(null);

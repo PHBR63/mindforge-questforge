@@ -717,6 +717,64 @@ export default function MapBuilder() {
     setModels3D(models3D.filter((m) => m.id !== modelId));
   };
 
+  // Duplicate 3D model
+  const handleModel3DDuplicate = async (modelId: string) => {
+    const model = models3D.find((m) => m.id === modelId);
+    if (!model || !activeMap || !user) return;
+
+    const { data, error } = await supabase
+      .from('map_3d_models')
+      .insert({
+        map_id: activeMap.id,
+        user_id: user.id,
+        name: `${model.name} (cópia)`,
+        file_url: model.file_url,
+        thumbnail_url: model.thumbnail_url,
+        position_x: model.position_x + 1,
+        position_y: model.position_y + 1,
+        position_z: model.position_z,
+        rotation_x: model.rotation_x,
+        rotation_y: model.rotation_y,
+        rotation_z: model.rotation_z,
+        scale: model.scale,
+        layer: model.layer,
+        is_visible: model.is_visible,
+        animation_name: model.animation_name,
+        animation_playing: false,
+        metadata: model.metadata,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao duplicar modelo 3D',
+        description: error.message,
+      });
+      return;
+    }
+
+    const newModel = {
+      ...data,
+      position_x: Number(data.position_x),
+      position_y: Number(data.position_y),
+      position_z: Number(data.position_z),
+      rotation_x: Number(data.rotation_x),
+      rotation_y: Number(data.rotation_y),
+      rotation_z: Number(data.rotation_z),
+      scale: Number(data.scale),
+    } as Map3DModel;
+
+    setModels3D([...models3D, newModel]);
+    setSelectedModel3DId(newModel.id);
+
+    toast({
+      title: 'Modelo duplicado!',
+      description: `${model.name} foi duplicado.`,
+    });
+  };
+
   if (!activeCampaign) {
     return (
       <AppLayout title="Construtor de Mapas">
@@ -951,6 +1009,9 @@ export default function MapBuilder() {
                       }
                     }}
                     onAssetMove={handleAssetMove}
+                    onModel3DMove={(modelId, x, y) => {
+                      handleModel3DUpdate(modelId, { position_x: x, position_y: y });
+                    }}
                     onCellClick={(x, y) => console.log('Cell clicked:', x, y)}
                     onAssetDrop={handleAssetPlace}
                     onDrawingComplete={handleDrawingComplete}
@@ -975,6 +1036,7 @@ export default function MapBuilder() {
                       if (id) setSelectedTokenId(null);
                     }}
                     onModel3DUpdate={handleModel3DUpdate}
+                    onModel3DDuplicate={handleModel3DDuplicate}
                     environment={environment3D}
                   />
                 )}
@@ -1011,6 +1073,7 @@ export default function MapBuilder() {
                   onModelCreate={handleModel3DCreate}
                   onModelUpdate={handleModel3DUpdate}
                   onModelDelete={handleModel3DDelete}
+                  onModelDuplicate={handleModel3DDuplicate}
                 />
               )}
 

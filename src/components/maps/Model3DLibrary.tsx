@@ -44,6 +44,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Model3DPresets } from './Model3DPresets';
+import { useModel3DCache } from './useModel3DCache';
 
 interface Model3DLibraryProps {
   mapId: string;
@@ -53,6 +55,7 @@ interface Model3DLibraryProps {
   onModelCreate: (model: Omit<Map3DModel, 'id' | 'map_id' | 'user_id' | 'created_at' | 'updated_at'>) => void;
   onModelUpdate: (modelId: string, updates: Partial<Map3DModel>) => void;
   onModelDelete: (modelId: string) => void;
+  onModelDuplicate?: (modelId: string) => void;
 }
 
 export function Model3DLibrary({
@@ -63,10 +66,14 @@ export function Model3DLibrary({
   onModelCreate,
   onModelUpdate,
   onModelDelete,
+  onModelDuplicate,
 }: Model3DLibraryProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Cache models for performance
+  const cacheStats = useModel3DCache(models);
 
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -192,6 +199,40 @@ export function Model3DLibrary({
     setIsUploadOpen(false);
   };
 
+  // Handle preset model selection
+  const handlePresetSelect = (preset: {
+    name: string;
+    scale: number;
+    previewColor: string;
+    presetId: string;
+  }) => {
+    // For now, create a placeholder model since we don't have actual GLTF URLs
+    // In production, you'd link to actual 3D model files
+    toast({
+      title: 'Modelo adicionado!',
+      description: `${preset.name} foi adicionado como placeholder. Faça upload de um modelo GLTF para substituí-lo.`,
+    });
+
+    // Create a placeholder entry - in a real app, you'd have actual model URLs
+    onModelCreate({
+      name: preset.name,
+      file_url: '', // Would be actual URL in production
+      thumbnail_url: null,
+      position_x: Math.floor(Math.random() * 10),
+      position_y: Math.floor(Math.random() * 10),
+      position_z: 0,
+      rotation_x: 0,
+      rotation_y: 0,
+      rotation_z: 0,
+      scale: preset.scale,
+      layer: 0,
+      is_visible: true,
+      animation_name: null,
+      animation_playing: false,
+      metadata: { presetId: preset.presetId, previewColor: preset.previewColor },
+    });
+  };
+
   return (
     <TooltipProvider>
       <div className="w-72 bg-card rounded-lg border border-border p-3 flex flex-col h-full">
@@ -199,15 +240,23 @@ export function Model3DLibrary({
           <div className="flex items-center gap-2">
             <Box className="w-4 h-4 text-primary" />
             <h3 className="font-display font-semibold text-sm">Modelos 3D</h3>
+            {cacheStats.cachedCount > 0 && (
+              <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                {cacheStats.cachedCount} em cache
+              </span>
+            )}
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-            className="h-7 px-2"
-          >
-            <Plus className="w-4 h-4" />
-          </Button>
+          <div className="flex gap-1">
+            <Model3DPresets onSelectPreset={handlePresetSelect} />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              className="h-7 px-2"
+            >
+              <Plus className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
 
         <input
@@ -326,14 +375,31 @@ export function Model3DLibrary({
           <div className="mt-3 pt-3 border-t border-border space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium truncate">{selectedModel.name}</span>
-              <Button
-                variant="destructive"
-                size="sm"
-                className="h-6 text-xs"
-                onClick={() => onModelDelete(selectedModel.id)}
-              >
-                <Trash2 className="w-3 h-3" />
-              </Button>
+              <div className="flex gap-1">
+                {onModelDuplicate && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 text-xs"
+                        onClick={() => onModelDuplicate(selectedModel.id)}
+                      >
+                        <Plus className="w-3 h-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Duplicar (Ctrl+D)</TooltipContent>
+                  </Tooltip>
+                )}
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="h-6 text-xs"
+                  onClick={() => onModelDelete(selectedModel.id)}
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-2">
