@@ -189,25 +189,25 @@ export default function Factions() {
     <AppLayout
       title="Facções"
       actions={
-        <div className="flex gap-2">
-          <div className="relative">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Buscar facções..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 w-64"
+              className="pl-9 w-full sm:w-48 md:w-64"
             />
           </div>
           <Dialog open={isDialogOpen} onOpenChange={(open) => {
             setIsDialogOpen(open);
             if (!open) resetForm();
           }}>
-            <Button onClick={() => setIsDialogOpen(true)} className="glow-gold">
+            <Button onClick={() => setIsDialogOpen(true)} className="glow-gold w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Nova Facção
             </Button>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="font-display">
                   {editingFaction ? 'Editar Facção' : 'Criar Facção'}
@@ -216,9 +216,9 @@ export default function Factions() {
                   {editingFaction ? 'Atualize as informações da facção' : 'Adicione uma nova organização à sua campanha'}
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid grid-cols-2 gap-4 py-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 py-4">
                 {/* Symbol Upload */}
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <ImageUpload
                     value={formData.symbol_url}
                     onChange={(url) => setFormData({ ...formData, symbol_url: url })}
@@ -244,7 +244,7 @@ export default function Factions() {
                     onChange={(e) => setFormData({ ...formData, leader: e.target.value })}
                   />
                 </div>
-                <div className="col-span-2 space-y-2">
+                <div className="sm:col-span-2 space-y-2">
                   <Label>Descrição</Label>
                   <Textarea
                     placeholder="Descreva a facção..."
@@ -288,14 +288,14 @@ export default function Factions() {
                   />
                 </div>
               </div>
-              <DialogFooter>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
                 <Button variant="outline" onClick={() => {
                   setIsDialogOpen(false);
                   resetForm();
-                }}>
+                }} className="w-full sm:w-auto">
                   Cancelar
                 </Button>
-                <Button onClick={handleSubmit}>
+                <Button onClick={handleSubmit} className="w-full sm:w-auto">
                   {editingFaction ? 'Salvar' : 'Criar Facção'}
                 </Button>
               </DialogFooter>
