@@ -74,12 +74,12 @@ export default function Campaigns() {
       actions={
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="font-display glow-gold">
+            <Button className="font-display glow-gold w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Nova Campanha
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="max-w-[95vw] sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle className="font-display">Criar Nova Campanha</DialogTitle>
               <DialogDescription>
@@ -125,11 +125,11 @@ export default function Campaigns() {
                 />
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="w-full sm:w-auto">
                 Cancelar
               </Button>
-              <Button onClick={handleCreate} disabled={createCampaign.isPending}>
+              <Button onClick={handleCreate} disabled={createCampaign.isPending} className="w-full sm:w-auto">
                 {createCampaign.isPending ? 'Criando...' : 'Criar Campanha'}
               </Button>
             </DialogFooter>

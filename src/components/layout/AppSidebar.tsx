@@ -49,15 +49,15 @@ export function AppSidebar() {
   const { signOut, user } = useAuth();
 
   return (
-    <Sidebar className="border-r border-border/50">
-      <SidebarHeader className="p-4">
-        <Link to="/" className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center">
-            <Scroll className="w-5 h-5 text-primary" />
+    <Sidebar className="border-r border-border/50 h-full">
+      <SidebarHeader className="p-3 md:p-4">
+        <Link to="/" className="flex items-center gap-2 md:gap-3">
+          <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
+            <Scroll className="w-4 h-4 md:w-5 md:h-5 text-primary" />
           </div>
-          <div>
-            <h1 className="font-display text-lg font-bold text-gold">BrainPG</h1>
-            <p className="text-xs text-muted-foreground">Gestão de Campanhas</p>
+          <div className="min-w-0">
+            <h1 className="font-display text-base md:text-lg font-bold text-gold truncate">BrainPG</h1>
+            <p className="text-xs text-muted-foreground truncate">Gestão de Campanhas</p>
           </div>
         </Link>
       </SidebarHeader>
@@ -65,7 +65,7 @@ export function AppSidebar() {
       <Separator className="bg-border/50" />
 
       <SidebarContent>
-        <ScrollArea className="flex-1 px-3 py-4">
+        <ScrollArea className="flex-1 px-2 md:px-3 py-3 md:py-4">
           <SidebarMenu>
             {mainNavItems.map((item) => (
               <SidebarMenuItem key={item.href}>
@@ -73,13 +73,13 @@ export function AppSidebar() {
                   asChild
                   isActive={location.pathname === item.href}
                   className={cn(
-                    'w-full justify-start gap-3 px-3 py-2 font-body',
+                    'w-full justify-start gap-2 md:gap-3 px-2 md:px-3 py-2 font-body text-sm md:text-base',
                     location.pathname === item.href && 'bg-primary/10 text-primary border-l-2 border-primary'
                   )}
                 >
                   <Link to={item.href}>
-                    <item.icon className="w-4 h-4" />
-                    <span>{item.label}</span>
+                    <item.icon className="w-4 h-4 shrink-0" />
+                    <span className="truncate">{item.label}</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -90,27 +90,27 @@ export function AppSidebar() {
 
       <Separator className="bg-border/50" />
 
-      <SidebarFooter className="p-4 space-y-2">
-        <div className="flex items-center gap-2 px-2 py-1">
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-            <Users className="w-4 h-4 text-primary" />
+      <SidebarFooter className="p-3 md:p-4 space-y-2">
+        <div className="flex items-center gap-2 px-1 md:px-2 py-1">
+          <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+            <Users className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">
+            <p className="text-xs md:text-sm font-medium truncate">
               {user?.email?.split('@')[0] || 'Mestre'}
             </p>
             <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="ghost" size="sm" className="flex-1" asChild>
+          <Button variant="ghost" size="sm" className="flex-1 text-xs md:text-sm" asChild>
             <Link to="/settings">
-              <Settings className="w-4 h-4 mr-2" />
+              <Settings className="w-3.5 h-3.5 md:w-4 md:h-4 mr-1.5 md:mr-2" />
               Config
             </Link>
           </Button>
           <Button variant="ghost" size="sm" onClick={signOut}>
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-3.5 h-3.5 md:w-4 md:h-4" />
           </Button>
         </div>
       </SidebarFooter>

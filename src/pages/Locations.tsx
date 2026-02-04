@@ -193,14 +193,14 @@ export default function Locations() {
     <AppLayout
       title="Locais"
       actions={
-        <div className="flex gap-2">
-          <div className="relative">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Buscar locais..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 w-64"
+              className="pl-9 w-full sm:w-48 md:w-64"
             />
           </div>
           <Dialog open={isDialogOpen} onOpenChange={(open) => {
@@ -210,11 +210,11 @@ export default function Locations() {
             <Button onClick={() => {
               resetForm();
               setIsDialogOpen(true);
-            }} className="glow-gold">
+            }} className="glow-gold w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Novo Local
             </Button>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="font-display">
                   {editingLocation ? 'Editar Local' : 'Criar Local'}
@@ -223,9 +223,9 @@ export default function Locations() {
                   {editingLocation ? 'Atualize as informações do local' : 'Adicione um novo local ao seu mundo'}
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid grid-cols-2 gap-4 py-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 py-4">
                 {/* Image Upload */}
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <ImageUpload
                     value={formData.image_url}
                     onChange={(url) => setFormData({ ...formData, image_url: url })}
@@ -254,7 +254,7 @@ export default function Locations() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="col-span-2 space-y-2">
+                <div className="sm:col-span-2 space-y-2">
                   <Label>Descrição</Label>
                   <Textarea
                     placeholder="Descreva o local..."
@@ -298,12 +298,12 @@ export default function Locations() {
                   />
                 </div>
               </div>
-              <DialogFooter>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
                 <Button variant="outline" onClick={() => {
                   setIsDialogOpen(false);
                   resetForm();
-                }}>Cancelar</Button>
-                <Button onClick={handleSubmit}>
+                }} className="w-full sm:w-auto">Cancelar</Button>
+                <Button onClick={handleSubmit} className="w-full sm:w-auto">
                   {editingLocation ? 'Salvar' : 'Criar Local'}
                 </Button>
               </DialogFooter>

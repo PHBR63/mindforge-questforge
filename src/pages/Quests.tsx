@@ -223,18 +223,18 @@ export default function Quests() {
     <AppLayout
       title="Missões"
       actions={
-        <div className="flex gap-2">
-          <div className="relative">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Buscar missões..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 w-48"
+              className="pl-9 w-full sm:w-36 md:w-48"
             />
           </div>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-36">
+            <SelectTrigger className="w-full sm:w-32 md:w-36">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -249,11 +249,11 @@ export default function Quests() {
             setIsDialogOpen(open);
             if (!open) resetForm();
           }}>
-            <Button onClick={() => setIsDialogOpen(true)} className="glow-gold">
+            <Button onClick={() => setIsDialogOpen(true)} className="glow-gold w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Nova Missão
             </Button>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="font-display">
                   {editingQuest ? 'Editar Missão' : 'Criar Missão'}
@@ -262,8 +262,8 @@ export default function Quests() {
                   {editingQuest ? 'Atualize as informações da missão' : 'Adicione uma nova missão à sua campanha'}
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid grid-cols-2 gap-4 py-4">
-                <div className="col-span-2 space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 py-4">
+                <div className="sm:col-span-2 space-y-2">
                   <Label>Título *</Label>
                   <Input
                     placeholder="Nome da missão"
@@ -301,7 +301,7 @@ export default function Quests() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="col-span-2 space-y-2">
+                <div className="sm:col-span-2 space-y-2">
                   <Label>Descrição</Label>
                   <Textarea
                     placeholder="Descreva a missão..."
@@ -310,7 +310,7 @@ export default function Quests() {
                     rows={3}
                   />
                 </div>
-                <div className="col-span-2 space-y-2">
+                <div className="sm:col-span-2 space-y-2">
                   <Label>Objetivos</Label>
                   <Textarea
                     placeholder="Liste os objetivos da missão..."
@@ -335,7 +335,7 @@ export default function Quests() {
                     onChange={(e) => setFormData({ ...formData, rewards: e.target.value })}
                   />
                 </div>
-                <div className="col-span-2 space-y-2">
+                <div className="sm:col-span-2 space-y-2">
                   <Label>Notas do Mestre</Label>
                   <Textarea
                     placeholder="Anotações secretas..."
@@ -345,14 +345,14 @@ export default function Quests() {
                   />
                 </div>
               </div>
-              <DialogFooter>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
                 <Button variant="outline" onClick={() => {
                   setIsDialogOpen(false);
                   resetForm();
-                }}>
+                }} className="w-full sm:w-auto">
                   Cancelar
                 </Button>
-                <Button onClick={handleSubmit}>
+                <Button onClick={handleSubmit} className="w-full sm:w-auto">
                   {editingQuest ? 'Salvar' : 'Criar Missão'}
                 </Button>
               </DialogFooter>

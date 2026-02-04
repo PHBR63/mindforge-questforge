@@ -232,25 +232,25 @@ export default function Sessions() {
     <AppLayout
       title="Sessões"
       actions={
-        <div className="flex gap-2">
-          <div className="relative">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Buscar sessões..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 w-64"
+              className="pl-9 w-full sm:w-48 md:w-64"
             />
           </div>
           <Dialog open={isDialogOpen} onOpenChange={(open) => {
             setIsDialogOpen(open);
             if (!open) resetForm();
           }}>
-            <Button onClick={() => setIsDialogOpen(true)} className="glow-gold">
+            <Button onClick={() => setIsDialogOpen(true)} className="glow-gold w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Nova Sessão
             </Button>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="font-display">
                   {editingSession ? 'Editar Sessão' : 'Criar Sessão'}
@@ -259,7 +259,7 @@ export default function Sessions() {
                   {editingSession ? 'Atualize as informações da sessão' : 'Planeje sua próxima sessão de jogo'}
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid grid-cols-2 gap-4 py-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 py-4">
                 <div className="space-y-2">
                   <Label>Número da Sessão *</Label>
                   <Input
@@ -283,7 +283,7 @@ export default function Sessions() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="col-span-2 space-y-2">
+                <div className="sm:col-span-2 space-y-2">
                   <Label>Título *</Label>
                   <Input
                     placeholder="Ex: A Cripta Esquecida"
@@ -291,7 +291,7 @@ export default function Sessions() {
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   />
                 </div>
-                <div className="col-span-2 space-y-2">
+                <div className="sm:col-span-2 space-y-2">
                   <Label>Data da Sessão</Label>
                   <Popover>
                     <PopoverTrigger asChild>
@@ -316,7 +316,7 @@ export default function Sessions() {
                     </PopoverContent>
                   </Popover>
                 </div>
-                <div className="col-span-2 space-y-2">
+                <div className="sm:col-span-2 space-y-2">
                   <Label>Conteúdo Planejado</Label>
                   <Textarea
                     placeholder="O que você planeja para esta sessão?"
@@ -325,7 +325,7 @@ export default function Sessions() {
                     rows={3}
                   />
                 </div>
-                <div className="col-span-2 space-y-2">
+                <div className="sm:col-span-2 space-y-2">
                   <Label>Eventos Reais</Label>
                   <Textarea
                     placeholder="O que realmente aconteceu? (preencher após a sessão)"
@@ -334,7 +334,7 @@ export default function Sessions() {
                     rows={3}
                   />
                 </div>
-                <div className="col-span-2 space-y-2">
+                <div className="sm:col-span-2 space-y-2">
                   <Label>Resumo</Label>
                   <Textarea
                     placeholder="Um breve resumo da sessão"
@@ -343,7 +343,7 @@ export default function Sessions() {
                     rows={2}
                   />
                 </div>
-                <div className="col-span-2 space-y-2">
+                <div className="sm:col-span-2 space-y-2">
                   <Label>Notas do Mestre</Label>
                   <Textarea
                     placeholder="Anotações pessoais..."
@@ -353,14 +353,14 @@ export default function Sessions() {
                   />
                 </div>
               </div>
-              <DialogFooter>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
                 <Button variant="outline" onClick={() => {
                   setIsDialogOpen(false);
                   resetForm();
-                }}>
+                }} className="w-full sm:w-auto">
                   Cancelar
                 </Button>
-                <Button onClick={handleSubmit}>
+                <Button onClick={handleSubmit} className="w-full sm:w-auto">
                   {editingSession ? 'Salvar' : 'Criar Sessão'}
                 </Button>
               </DialogFooter>

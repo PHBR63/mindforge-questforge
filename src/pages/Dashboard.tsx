@@ -42,28 +42,28 @@ export default function Dashboard() {
 
   return (
     <AppLayout title="Dashboard">
-      <div className="space-y-8">
+      <div className="space-y-6 md:space-y-8">
         {/* Welcome Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-background border border-primary/20 p-8"
+          className="relative overflow-hidden rounded-xl md:rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-background border border-primary/20 p-4 sm:p-6 md:p-8"
         >
-          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2" />
+          <div className="absolute top-0 right-0 w-32 sm:w-48 md:w-64 h-32 sm:h-48 md:h-64 bg-primary/10 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2" />
           <div className="relative">
             <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="w-5 h-5 text-primary" />
-              <span className="text-sm text-primary font-medium">RPG Master</span>
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+              <span className="text-xs sm:text-sm text-primary font-medium">RPG Master</span>
             </div>
-            <h1 className="font-display text-3xl md:text-4xl font-bold mb-2">
+            <h1 className="font-display text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-2">
               Bem-vindo, Mestre!
             </h1>
-            <p className="text-muted-foreground max-w-lg">
+            <p className="text-sm sm:text-base text-muted-foreground max-w-lg">
               Organize suas campanhas, crie NPCs memoráveis, construa mundos 
               épicos e mantenha tudo conectado com mapas mentais.
             </p>
             {!activeCampaign && (
-              <Button className="mt-6 glow-gold" onClick={() => navigate('/campaigns')}>
+              <Button className="mt-4 sm:mt-6 glow-gold w-full sm:w-auto" onClick={() => navigate('/campaigns')}>
                 <Scroll className="w-4 h-4 mr-2" />
                 Começar uma Campanha
                 <ArrowRight className="w-4 h-4 ml-2" />
@@ -116,8 +116,8 @@ export default function Dashboard() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <h2 className="font-display text-xl font-bold mb-4">Acesso Rápido</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <h2 className="font-display text-lg md:text-xl font-bold mb-3 md:mb-4">Acesso Rápido</h2>
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 sm:gap-3 md:gap-4">
             {quickActions.map((action, index) => (
               <motion.div
                 key={action.href}
@@ -129,9 +129,9 @@ export default function Dashboard() {
                   className="cursor-pointer hover:border-primary/50 hover:bg-card/80 transition-all group"
                   onClick={() => navigate(action.href)}
                 >
-                  <CardContent className="flex flex-col items-center justify-center p-6 text-center">
-                    <action.icon className={`w-8 h-8 mb-2 ${action.color} group-hover:scale-110 transition-transform`} />
-                    <span className="font-display text-sm">{action.label}</span>
+                  <CardContent className="flex flex-col items-center justify-center p-3 sm:p-4 md:p-6 text-center">
+                    <action.icon className={`w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 mb-1 sm:mb-2 ${action.color} group-hover:scale-110 transition-transform`} />
+                    <span className="font-display text-xs sm:text-sm truncate w-full">{action.label}</span>
                   </CardContent>
                 </Card>
               </motion.div>
