@@ -124,9 +124,6 @@ function MindMapContent() {
         data: {
           label: node.title,
           nodeData: node as MindMapNodeData,
-          onEdit: handleEditNode,
-          onDelete: handleConfirmDelete,
-          onDuplicate: handleDuplicateNode,
           isSelected: false,
         },
       }));
@@ -148,6 +145,21 @@ function MindMapContent() {
 
     loadMindMap();
   }, [activeCampaign]);
+
+  // Update node callbacks when handlers change
+  useEffect(() => {
+    setNodes((nds) =>
+      nds.map((n) => ({
+        ...n,
+        data: {
+          ...n.data,
+          onEdit: handleEditNode,
+          onDelete: handleConfirmDelete,
+          onDuplicate: handleDuplicateNode,
+        },
+      }))
+    );
+  }, [nodeDataMap]);
 
   // Keyboard shortcuts
   useEffect(() => {
