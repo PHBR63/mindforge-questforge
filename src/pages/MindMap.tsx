@@ -151,16 +151,20 @@ function MindMapContent() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Copy (Ctrl+C)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedNodeIds.size > 0) {
+      // Ignore if user is typing in an input field
+      const target = e.target as HTMLElement;
+      const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+      // Copy (Ctrl+C) - allow in inputs for normal copy behavior
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedNodeIds.size > 0 && !isTyping) {
         e.preventDefault();
         setCopiedNodeIds(Array.from(selectedNodeIds));
         toast({ title: 'Copiado!', description: `${selectedNodeIds.size} nó(s) copiado(s).` });
         return;
       }
 
-      // Paste (Ctrl+V)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'v' && copiedNodeIds.length > 0) {
+      // Paste (Ctrl+V) - allow in inputs for normal paste behavior
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v' && copiedNodeIds.length > 0 && !isTyping) {
         e.preventDefault();
         handlePasteNodes();
         return;
@@ -168,8 +172,8 @@ function MindMapContent() {
 
       if (selectedNodeIds.size === 0) return;
 
-      // Delete node(s)
-      if (e.key === 'Delete' || e.key === 'Backspace') {
+      // Delete node(s) - only when not typing
+      if ((e.key === 'Delete' || e.key === 'Backspace') && !isTyping) {
         e.preventDefault();
         if (selectedNodeIds.size === 1) {
           handleConfirmDelete(Array.from(selectedNodeIds)[0]);
@@ -178,8 +182,8 @@ function MindMapContent() {
         }
       }
 
-      // Duplicate node(s) (Ctrl+D)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+      // Duplicate node(s) (Ctrl+D) - only when not typing
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd' && !isTyping) {
         e.preventDefault();
         if (selectedNodeIds.size === 1) {
           handleDuplicateNode(Array.from(selectedNodeIds)[0]);
