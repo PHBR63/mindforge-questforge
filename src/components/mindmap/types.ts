@@ -55,6 +55,7 @@ export interface MindMapNode extends Node {
     nodeData: MindMapNodeData;
     onEdit: (id: string) => void;
     onDelete: (id: string) => void;
+    onDuplicate: (id: string) => void;
     isSelected: boolean;
   };
 }
