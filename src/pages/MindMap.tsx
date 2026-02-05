@@ -84,6 +84,7 @@ function MindMapContent() {
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
   const [copiedNodeIds, setCopiedNodeIds] = useState<string[]>([]);
   const [nodeToDelete, setNodeToDelete] = useState<string | null>(null);
+  const [isBatchDeleteDialogOpen, setIsBatchDeleteDialogOpen] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -178,7 +179,7 @@ function MindMapContent() {
         if (selectedNodeIds.size === 1) {
           handleConfirmDelete(Array.from(selectedNodeIds)[0]);
         } else {
-          handleBatchDelete();
+          setIsBatchDeleteDialogOpen(true);
         }
       }
 
@@ -295,9 +296,13 @@ function MindMapContent() {
     const nodeData = nodeDataMap.get(nodeId);
     if (!nodeData) return;
 
+    // Get current visual position from nodes state
+    const currentNode = nodes.find(n => n.id === nodeId);
+    const currentPosition = currentNode?.position || { x: nodeData.position_x || 0, y: nodeData.position_y || 0 };
+
     const newPosition = {
-      x: (nodeData.position_x || 0) + 50,
-      y: (nodeData.position_y || 0) + 50,
+      x: currentPosition.x + 50,
+      y: currentPosition.y + 50,
     };
 
     const { data, error } = await supabase
@@ -353,9 +358,13 @@ function MindMapContent() {
       const nodeData = nodeDataMap.get(nodeId);
       if (!nodeData) continue;
 
+      // Get current visual position from nodes state
+      const currentNode = nodes.find(n => n.id === nodeId);
+      const currentPosition = currentNode?.position || { x: nodeData.position_x || 0, y: nodeData.position_y || 0 };
+
       const newPosition = {
-        x: (nodeData.position_x || 0) + 50,
-        y: (nodeData.position_y || 0) + 50,
+        x: currentPosition.x + 50,
+        y: currentPosition.y + 50,
       };
 
       const { data, error } = await supabase
@@ -445,9 +454,13 @@ function MindMapContent() {
       const nodeData = nodeDataMap.get(nodeId);
       if (!nodeData) continue;
 
+      // Get current visual position from nodes state
+      const currentNode = nodes.find(n => n.id === nodeId);
+      const currentPosition = currentNode?.position || { x: nodeData.position_x || 0, y: nodeData.position_y || 0 };
+
       const newPosition = {
-        x: (nodeData.position_x || 0) + offsetX,
-        y: (nodeData.position_y || 0) + 50,
+        x: currentPosition.x + offsetX,
+        y: currentPosition.y + 50,
       };
 
       const { data, error } = await supabase
@@ -904,6 +917,30 @@ function MindMapContent() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteNode} className="bg-destructive text-destructive-foreground">
               Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Batch Delete Confirmation */}
+      <AlertDialog open={isBatchDeleteDialogOpen} onOpenChange={setIsBatchDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir {selectedNodeIds.size} Nós?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Todos os nós selecionados e suas conexões serão removidos permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                handleBatchDelete();
+                setIsBatchDeleteDialogOpen(false);
+              }} 
+              className="bg-destructive text-destructive-foreground"
+            >
+              Excluir Todos
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
