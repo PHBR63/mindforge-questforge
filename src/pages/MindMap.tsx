@@ -81,7 +81,8 @@ function MindMapContent() {
   const [connectionType, setConnectionType] = useState<ConnectionType>('default');
 
   // Selection and deletion
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
+  const [copiedNodeIds, setCopiedNodeIds] = useState<string[]>([]);
   const [nodeToDelete, setNodeToDelete] = useState<string | null>(null);
 
   const [isSaving, setIsSaving] = useState(false);
@@ -124,6 +125,7 @@ function MindMapContent() {
           nodeData: node as MindMapNodeData,
           onEdit: handleEditNode,
           onDelete: handleConfirmDelete,
+          onDuplicate: handleDuplicateNode,
           isSelected: false,
         },
       }));
@@ -149,48 +151,87 @@ function MindMapContent() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!selectedNodeId) return;
-
-      // Delete node
-      if (e.key === 'Delete' || e.key === 'Backspace') {
+      // Copy (Ctrl+C)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedNodeIds.size > 0) {
         e.preventDefault();
-        handleConfirmDelete(selectedNodeId);
+        setCopiedNodeIds(Array.from(selectedNodeIds));
+        toast({ title: 'Copiado!', description: `${selectedNodeIds.size} nó(s) copiado(s).` });
+        return;
       }
 
-      // Duplicate node (Ctrl+D)
+      // Paste (Ctrl+V)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v' && copiedNodeIds.length > 0) {
+        e.preventDefault();
+        handlePasteNodes();
+        return;
+      }
+
+      if (selectedNodeIds.size === 0) return;
+
+      // Delete node(s)
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        if (selectedNodeIds.size === 1) {
+          handleConfirmDelete(Array.from(selectedNodeIds)[0]);
+        } else {
+          handleBatchDelete();
+        }
+      }
+
+      // Duplicate node(s) (Ctrl+D)
       if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
         e.preventDefault();
-        handleDuplicateNode(selectedNodeId);
+        if (selectedNodeIds.size === 1) {
+          handleDuplicateNode(Array.from(selectedNodeIds)[0]);
+        } else {
+          handleBatchDuplicate();
+        }
       }
 
       // Escape to deselect
       if (e.key === 'Escape') {
-        setSelectedNodeId(null);
-        updateNodeSelection(null);
+        setSelectedNodeIds(new Set());
+        updateNodeSelection(new Set());
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNodeId, nodeDataMap]);
+  }, [selectedNodeIds, copiedNodeIds, nodeDataMap]);
 
-  const updateNodeSelection = (nodeId: string | null) => {
+  const updateNodeSelection = (nodeIds: Set<string>) => {
     setNodes((nds) =>
       nds.map((n) => ({
         ...n,
-        data: { ...n.data, isSelected: n.id === nodeId },
+        data: { ...n.data, isSelected: nodeIds.has(n.id) },
       }))
     );
   };
 
-  const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
-    setSelectedNodeId(node.id);
-    updateNodeSelection(node.id);
+  const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    if (event.shiftKey) {
+      // Multi-select with Shift
+      setSelectedNodeIds((prev) => {
+        const newSet = new Set(prev);
+        if (newSet.has(node.id)) {
+          newSet.delete(node.id);
+        } else {
+          newSet.add(node.id);
+        }
+        updateNodeSelection(newSet);
+        return newSet;
+      });
+    } else {
+      // Single select
+      const newSet = new Set([node.id]);
+      setSelectedNodeIds(newSet);
+      updateNodeSelection(newSet);
+    }
   }, []);
 
   const handlePaneClick = useCallback(() => {
-    setSelectedNodeId(null);
-    updateNodeSelection(null);
+    setSelectedNodeIds(new Set());
+    updateNodeSelection(new Set());
   }, []);
 
   // Edit node
@@ -237,7 +278,7 @@ function MindMapContent() {
     nodeDataMap.delete(nodeToDelete);
     setNodeDataMap(new Map(nodeDataMap));
     setNodeToDelete(null);
-    setSelectedNodeId(null);
+    setSelectedNodeIds(new Set());
     setIsDeleteDialogOpen(false);
 
     toast({ title: 'Nó excluído!', description: 'O elemento foi removido do mapa.' });
@@ -288,12 +329,163 @@ function MindMapContent() {
         nodeData: newNodeData,
         onEdit: handleEditNode,
         onDelete: handleConfirmDelete,
+        onDuplicate: handleDuplicateNode,
         isSelected: false,
       },
     };
 
     setNodes((nds) => [...nds, newNode]);
     toast({ title: 'Nó duplicado!', description: `${data.title} foi criado.` });
+  };
+
+  // Batch duplicate multiple nodes
+  const handleBatchDuplicate = async () => {
+    if (!activeCampaign || !user || selectedNodeIds.size === 0) return;
+
+    const nodeIdsArray = Array.from(selectedNodeIds);
+    let successCount = 0;
+
+    for (const nodeId of nodeIdsArray) {
+      const nodeData = nodeDataMap.get(nodeId);
+      if (!nodeData) continue;
+
+      const newPosition = {
+        x: (nodeData.position_x || 0) + 50,
+        y: (nodeData.position_y || 0) + 50,
+      };
+
+      const { data, error } = await supabase
+        .from('mind_map_nodes')
+        .insert({
+          campaign_id: activeCampaign.id,
+          user_id: user.id,
+          title: `${nodeData.title} (cópia)`,
+          content: nodeData.content,
+          node_type: nodeData.node_type,
+          position_x: newPosition.x,
+          position_y: newPosition.y,
+          color: nodeData.color,
+        })
+        .select()
+        .single();
+
+      if (!error && data) {
+        const newNodeData = data as MindMapNodeData;
+        nodeDataMap.set(data.id, newNodeData);
+
+        const newNode: Node = {
+          id: data.id,
+          type: 'mindmap',
+          position: newPosition,
+          data: {
+            label: data.title,
+            nodeData: newNodeData,
+            onEdit: handleEditNode,
+            onDelete: handleConfirmDelete,
+            onDuplicate: handleDuplicateNode,
+            isSelected: false,
+          },
+        };
+        setNodes((nds) => [...nds, newNode]);
+        successCount++;
+      }
+    }
+
+    setNodeDataMap(new Map(nodeDataMap));
+    toast({ title: 'Nós duplicados!', description: `${successCount} nó(s) duplicado(s).` });
+  };
+
+  // Batch delete multiple nodes
+  const handleBatchDelete = async () => {
+    if (!activeCampaign || selectedNodeIds.size === 0) return;
+
+    const nodeIdsArray = Array.from(selectedNodeIds);
+
+    // Delete all connections first
+    for (const nodeId of nodeIdsArray) {
+      await supabase
+        .from('mind_map_connections')
+        .delete()
+        .or(`source_node_id.eq.${nodeId},target_node_id.eq.${nodeId}`);
+    }
+
+    // Delete all nodes
+    const { error } = await supabase
+      .from('mind_map_nodes')
+      .delete()
+      .in('id', nodeIdsArray);
+
+    if (error) {
+      toast({ variant: 'destructive', title: 'Erro ao excluir', description: error.message });
+      return;
+    }
+
+    setNodes((nds) => nds.filter((n) => !selectedNodeIds.has(n.id)));
+    setEdges((eds) => eds.filter((e) => !selectedNodeIds.has(e.source) && !selectedNodeIds.has(e.target)));
+    
+    nodeIdsArray.forEach((id) => nodeDataMap.delete(id));
+    setNodeDataMap(new Map(nodeDataMap));
+    setSelectedNodeIds(new Set());
+
+    toast({ title: 'Nós excluídos!', description: `${nodeIdsArray.length} nó(s) removido(s).` });
+  };
+
+  // Paste copied nodes
+  const handlePasteNodes = async () => {
+    if (!activeCampaign || !user || copiedNodeIds.length === 0) return;
+
+    let successCount = 0;
+    let offsetX = 100;
+
+    for (const nodeId of copiedNodeIds) {
+      const nodeData = nodeDataMap.get(nodeId);
+      if (!nodeData) continue;
+
+      const newPosition = {
+        x: (nodeData.position_x || 0) + offsetX,
+        y: (nodeData.position_y || 0) + 50,
+      };
+
+      const { data, error } = await supabase
+        .from('mind_map_nodes')
+        .insert({
+          campaign_id: activeCampaign.id,
+          user_id: user.id,
+          title: `${nodeData.title} (cópia)`,
+          content: nodeData.content,
+          node_type: nodeData.node_type,
+          position_x: newPosition.x,
+          position_y: newPosition.y,
+          color: nodeData.color,
+        })
+        .select()
+        .single();
+
+      if (!error && data) {
+        const newNodeData = data as MindMapNodeData;
+        nodeDataMap.set(data.id, newNodeData);
+
+        const newNode: Node = {
+          id: data.id,
+          type: 'mindmap',
+          position: newPosition,
+          data: {
+            label: data.title,
+            nodeData: newNodeData,
+            onEdit: handleEditNode,
+            onDelete: handleConfirmDelete,
+            onDuplicate: handleDuplicateNode,
+            isSelected: false,
+          },
+        };
+        setNodes((nds) => [...nds, newNode]);
+        successCount++;
+        offsetX += 50;
+      }
+    }
+
+    setNodeDataMap(new Map(nodeDataMap));
+    toast({ title: 'Colado!', description: `${successCount} nó(s) colado(s).` });
   };
 
   // Add or update node
@@ -380,6 +572,7 @@ function MindMapContent() {
           nodeData: newNodeData,
           onEdit: handleEditNode,
           onDelete: handleConfirmDelete,
+          onDuplicate: handleDuplicateNode,
           isSelected: false,
         },
       };
@@ -527,6 +720,7 @@ function MindMapContent() {
           nodeData,
           onEdit: handleEditNode,
           onDelete: handleConfirmDelete,
+          onDuplicate: handleDuplicateNode,
           isSelected: false,
         },
       };

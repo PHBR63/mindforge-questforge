@@ -66,14 +66,18 @@ export function MindMapToolbar({
           <TooltipTrigger asChild>
             <div className="flex items-center gap-1 text-xs text-muted-foreground px-2 border rounded-md h-8 bg-card">
               <Keyboard className="w-3 h-3" />
-              <span className="hidden sm:inline">Del: excluir | Ctrl+D: duplicar</span>
+              <span className="hidden sm:inline">Shift+clique: multi-seleção</span>
             </div>
           </TooltipTrigger>
           <TooltipContent className="max-w-xs">
             <div className="space-y-1 text-xs">
-              <p><kbd className="px-1 bg-muted rounded">Delete</kbd> - Excluir nó selecionado</p>
-              <p><kbd className="px-1 bg-muted rounded">Ctrl+D</kbd> - Duplicar nó selecionado</p>
+              <p><kbd className="px-1 bg-muted rounded">Shift+Clique</kbd> - Selecionar múltiplos nós</p>
+              <p><kbd className="px-1 bg-muted rounded">Delete</kbd> - Excluir nó(s) selecionado(s)</p>
+              <p><kbd className="px-1 bg-muted rounded">Ctrl+D</kbd> - Duplicar nó(s) selecionado(s)</p>
+              <p><kbd className="px-1 bg-muted rounded">Ctrl+C</kbd> - Copiar nó(s) selecionado(s)</p>
+              <p><kbd className="px-1 bg-muted rounded">Ctrl+V</kbd> - Colar nó(s) copiado(s)</p>
               <p><kbd className="px-1 bg-muted rounded">Escape</kbd> - Desselecionar</p>
+              <p><kbd className="px-1 bg-muted rounded">Clique direito</kbd> - Menu de contexto</p>
             </div>
           </TooltipContent>
         </Tooltip>
