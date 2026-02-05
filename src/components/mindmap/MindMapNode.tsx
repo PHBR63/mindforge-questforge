@@ -1,7 +1,14 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps, Node } from '@xyflow/react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 import { NODE_TYPES, MindMapNodeData } from './types';
 
 type MindMapNodeType = Node<{
@@ -9,14 +16,15 @@ type MindMapNodeType = Node<{
   nodeData: MindMapNodeData;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  onDuplicate: (id: string) => void;
   isSelected: boolean;
 }>;
 
 function MindMapNodeComponent({ data, id }: NodeProps<MindMapNodeType>) {
-  const { nodeData, onEdit, onDelete, isSelected } = data;
+  const { nodeData, onEdit, onDelete, onDuplicate, isSelected } = data;
   const nodeType = NODE_TYPES[nodeData.node_type as keyof typeof NODE_TYPES] || NODE_TYPES.idea;
 
-  return (
+  const nodeContent = (
     <div
       className={`
         relative cursor-pointer transition-all duration-200 group
@@ -45,8 +53,21 @@ function MindMapNodeComponent({ data, id }: NodeProps<MindMapNodeType>) {
               e.stopPropagation();
               onEdit(id);
             }}
+            title="Editar (ou clique duplo)"
           >
             <Pencil className="h-3 w-3" />
+          </Button>
+          <Button
+            size="icon"
+            variant="secondary"
+            className="h-6 w-6 rounded-full shadow-md"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDuplicate(id);
+            }}
+            title="Duplicar (Ctrl+D)"
+          >
+            <Copy className="h-3 w-3" />
           </Button>
           <Button
             size="icon"
@@ -56,6 +77,7 @@ function MindMapNodeComponent({ data, id }: NodeProps<MindMapNodeType>) {
               e.stopPropagation();
               onDelete(id);
             }}
+            title="Excluir (Delete)"
           >
             <Trash2 className="h-3 w-3" />
           </Button>
@@ -106,6 +128,34 @@ function MindMapNodeComponent({ data, id }: NodeProps<MindMapNodeType>) {
         className="!bg-white !w-3 !h-3 !border-2 !border-gray-400"
       />
     </div>
+  );
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        {nodeContent}
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-48">
+        <ContextMenuItem onClick={() => onEdit(id)}>
+          <Pencil className="h-4 w-4 mr-2" />
+          Editar
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => onDuplicate(id)}>
+          <Copy className="h-4 w-4 mr-2" />
+          Duplicar
+          <span className="ml-auto text-xs text-muted-foreground">Ctrl+D</span>
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem 
+          onClick={() => onDelete(id)}
+          className="text-destructive focus:text-destructive"
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
+          Excluir
+          <span className="ml-auto text-xs text-muted-foreground">Del</span>
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 
