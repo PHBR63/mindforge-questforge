@@ -782,6 +782,17 @@ function MindMapContent() {
     }
   };
 
+  // Auto-save position on drag stop
+  const handleNodeDragStop = useCallback(
+    async (_event: React.MouseEvent, node: Node) => {
+      await supabase
+        .from('mind_map_nodes')
+        .update({ position_x: node.position.x, position_y: node.position.y })
+        .eq('id', node.id);
+    },
+    []
+  );
+
   // Zoom controls
   const handleZoomIn = () => reactFlowInstance.zoomIn();
   const handleZoomOut = () => reactFlowInstance.zoomOut();
@@ -855,6 +866,7 @@ function MindMapContent() {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onNodeClick={handleNodeClick}
+            onNodeDragStop={handleNodeDragStop}
             onPaneClick={handlePaneClick}
             onEdgeDoubleClick={handleEdgeDoubleClick}
             nodeTypes={nodeTypes}
