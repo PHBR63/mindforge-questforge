@@ -1,4 +1,5 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
+import { useMindMapUndo } from '@/hooks/useMindMapUndo';
 import {
   ReactFlow,
   MiniMap,
@@ -87,6 +88,7 @@ function MindMapContent() {
   const [isBatchDeleteDialogOpen, setIsBatchDeleteDialogOpen] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
+  const { pushAction, popAction, canUndo } = useMindMapUndo();
 
   // Load data from database
   useEffect(() => {
@@ -161,12 +163,178 @@ function MindMapContent() {
     );
   }, [nodeDataMap]);
 
+  // Undo handler
+  const handleUndo = useCallback(async () => {
+    const action = popAction();
+    if (!action) return;
+
+    switch (action.type) {
+      case 'create_node': {
+        // Undo create = delete the node
+        await supabase.from('mind_map_connections').delete()
+          .or(`source_node_id.eq.${action.nodeId},target_node_id.eq.${action.nodeId}`);
+        await supabase.from('mind_map_nodes').delete().eq('id', action.nodeId);
+        setNodes((nds) => nds.filter((n) => n.id !== action.nodeId));
+        setEdges((eds) => eds.filter((e) => e.source !== action.nodeId && e.target !== action.nodeId));
+        nodeDataMap.delete(action.nodeId);
+        setNodeDataMap(new Map(nodeDataMap));
+        break;
+      }
+      case 'delete_node': {
+        // Undo delete = re-create the node and its edges
+        const { data } = await supabase.from('mind_map_nodes').insert({
+          id: action.nodeData.id,
+          campaign_id: action.nodeData.campaign_id,
+          user_id: action.nodeData.user_id,
+          title: action.nodeData.title,
+          content: action.nodeData.content,
+          node_type: action.nodeData.node_type,
+          color: action.nodeData.color,
+          position_x: action.position.x,
+          position_y: action.position.y,
+          entity_id: action.nodeData.entity_id,
+          entity_type: action.nodeData.entity_type,
+        }).select().single();
+
+        if (data) {
+          const nd = data as MindMapNodeData;
+          nodeDataMap.set(data.id, nd);
+          setNodeDataMap(new Map(nodeDataMap));
+          setNodes((nds) => [...nds, {
+            id: data.id, type: 'mindmap',
+            position: action.position,
+            data: { label: data.title, nodeData: nd, isSelected: false },
+          }]);
+
+          // Re-create edges
+          for (const edge of action.edges) {
+            const { data: edgeData } = await supabase.from('mind_map_connections').insert({
+              id: edge.id,
+              campaign_id: action.nodeData.campaign_id,
+              user_id: action.nodeData.user_id,
+              source_node_id: edge.source,
+              target_node_id: edge.target,
+              label: edge.label,
+              connection_type: edge.connectionType,
+            }).select().single();
+            if (edgeData) {
+              setEdges((eds) => [...eds, {
+                id: edgeData.id, source: edgeData.source_node_id, target: edgeData.target_node_id,
+                type: 'mindmap', data: { label: edgeData.label, connectionType: edgeData.connection_type || 'default' },
+              }]);
+            }
+          }
+        }
+        break;
+      }
+      case 'move_node': {
+        await supabase.from('mind_map_nodes').update({
+          position_x: action.oldPosition.x, position_y: action.oldPosition.y,
+        }).eq('id', action.nodeId);
+        setNodes((nds) => nds.map((n) =>
+          n.id === action.nodeId ? { ...n, position: action.oldPosition } : n
+        ));
+        break;
+      }
+      case 'create_edge': {
+        await supabase.from('mind_map_connections').delete().eq('id', action.edgeId);
+        setEdges((eds) => eds.filter((e) => e.id !== action.edgeId));
+        break;
+      }
+      case 'update_node': {
+        const oldData = action.oldData;
+        const updatePayload: any = {};
+        if (oldData.title !== undefined) updatePayload.title = oldData.title;
+        if (oldData.content !== undefined) updatePayload.content = oldData.content;
+        if (oldData.node_type !== undefined) updatePayload.node_type = oldData.node_type;
+        if (oldData.color !== undefined) updatePayload.color = oldData.color;
+
+        await supabase.from('mind_map_nodes').update(updatePayload).eq('id', action.nodeId);
+        
+        const current = nodeDataMap.get(action.nodeId);
+        if (current) {
+          const restored = { ...current, ...oldData };
+          nodeDataMap.set(action.nodeId, restored);
+          setNodeDataMap(new Map(nodeDataMap));
+          setNodes((nds) => nds.map((n) =>
+            n.id === action.nodeId ? { ...n, data: { ...n.data, label: restored.title, nodeData: restored } } : n
+          ));
+        }
+        break;
+      }
+      case 'batch_create_nodes': {
+        for (const nodeId of action.nodeIds) {
+          await supabase.from('mind_map_connections').delete()
+            .or(`source_node_id.eq.${nodeId},target_node_id.eq.${nodeId}`);
+          await supabase.from('mind_map_nodes').delete().eq('id', nodeId);
+          nodeDataMap.delete(nodeId);
+        }
+        const idsSet = new Set(action.nodeIds);
+        setNodes((nds) => nds.filter((n) => !idsSet.has(n.id)));
+        setEdges((eds) => eds.filter((e) => !idsSet.has(e.source) && !idsSet.has(e.target)));
+        setNodeDataMap(new Map(nodeDataMap));
+        break;
+      }
+      case 'batch_delete_nodes': {
+        for (const item of action.items) {
+          const { data } = await supabase.from('mind_map_nodes').insert({
+            id: item.nodeData.id,
+            campaign_id: item.nodeData.campaign_id,
+            user_id: item.nodeData.user_id,
+            title: item.nodeData.title,
+            content: item.nodeData.content,
+            node_type: item.nodeData.node_type,
+            color: item.nodeData.color,
+            position_x: item.position.x,
+            position_y: item.position.y,
+            entity_id: item.nodeData.entity_id,
+            entity_type: item.nodeData.entity_type,
+          }).select().single();
+
+          if (data) {
+            const nd = data as MindMapNodeData;
+            nodeDataMap.set(data.id, nd);
+            setNodes((nds) => [...nds, {
+              id: data.id, type: 'mindmap', position: item.position,
+              data: { label: data.title, nodeData: nd, isSelected: false },
+            }]);
+
+            for (const edge of item.edges) {
+              const { data: edgeData } = await supabase.from('mind_map_connections').insert({
+                id: edge.id, campaign_id: edge.campaign_id, user_id: edge.user_id,
+                source_node_id: edge.source, target_node_id: edge.target,
+                label: edge.label, connection_type: edge.connectionType,
+              }).select().single();
+              if (edgeData) {
+                setEdges((eds) => [...eds, {
+                  id: edgeData.id, source: edgeData.source_node_id, target: edgeData.target_node_id,
+                  type: 'mindmap', data: { label: edgeData.label, connectionType: edgeData.connection_type || 'default' },
+                }]);
+              }
+            }
+          }
+        }
+        setNodeDataMap(new Map(nodeDataMap));
+        break;
+      }
+    }
+
+    toast({ title: 'Desfeito!', description: 'Última ação foi revertida.' });
+  }, [nodeDataMap, toast]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if user is typing in an input field
       const target = e.target as HTMLElement;
       const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+      // Undo (Ctrl+Z)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !isTyping) {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
 
       // Copy (Ctrl+C) - allow in inputs for normal copy behavior
       if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedNodeIds.size > 0 && !isTyping) {
@@ -214,7 +382,7 @@ function MindMapContent() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNodeIds, copiedNodeIds, nodeDataMap]);
+  }, [selectedNodeIds, copiedNodeIds, nodeDataMap, handleUndo]);
 
   const updateNodeSelection = (nodeIds: Set<string>) => {
     setNodes((nds) =>
@@ -273,6 +441,19 @@ function MindMapContent() {
   const handleDeleteNode = async () => {
     if (!nodeToDelete || !activeCampaign) return;
 
+    // Save undo data before deleting
+    const deletedNodeData = nodeDataMap.get(nodeToDelete);
+    const deletedNode = nodes.find((n) => n.id === nodeToDelete);
+    const deletedEdges = edges
+      .filter((e) => e.source === nodeToDelete || e.target === nodeToDelete)
+      .map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        label: (e.data as any)?.label || null,
+        connectionType: (e.data as any)?.connectionType || null,
+      }));
+
     // Delete connections first
     await supabase
       .from('mind_map_connections')
@@ -288,6 +469,15 @@ function MindMapContent() {
     if (error) {
       toast({ variant: 'destructive', title: 'Erro ao excluir', description: error.message });
       return;
+    }
+
+    if (deletedNodeData && deletedNode) {
+      pushAction({
+        type: 'delete_node',
+        nodeData: deletedNodeData,
+        position: deletedNode.position,
+        edges: deletedEdges,
+      });
     }
 
     setNodes((nds) => nds.filter((n) => n.id !== nodeToDelete));
@@ -356,6 +546,7 @@ function MindMapContent() {
     };
 
     setNodes((nds) => [...nds, newNode]);
+    pushAction({ type: 'create_node', nodeId: data.id });
     toast({ title: 'Nó duplicado!', description: `${data.title} foi criado.` });
   };
 
@@ -365,57 +556,44 @@ function MindMapContent() {
 
     const nodeIdsArray = Array.from(selectedNodeIds);
     let successCount = 0;
+    const createdIds: string[] = [];
 
     for (const nodeId of nodeIdsArray) {
       const nodeData = nodeDataMap.get(nodeId);
       if (!nodeData) continue;
 
-      // Get current visual position from nodes state
       const currentNode = nodes.find(n => n.id === nodeId);
       const currentPosition = currentNode?.position || { x: nodeData.position_x || 0, y: nodeData.position_y || 0 };
 
-      const newPosition = {
-        x: currentPosition.x + 50,
-        y: currentPosition.y + 50,
-      };
+      const newPosition = { x: currentPosition.x + 50, y: currentPosition.y + 50 };
 
       const { data, error } = await supabase
         .from('mind_map_nodes')
         .insert({
-          campaign_id: activeCampaign.id,
-          user_id: user.id,
-          title: `${nodeData.title} (cópia)`,
-          content: nodeData.content,
-          node_type: nodeData.node_type,
-          position_x: newPosition.x,
-          position_y: newPosition.y,
-          color: nodeData.color,
+          campaign_id: activeCampaign.id, user_id: user.id,
+          title: `${nodeData.title} (cópia)`, content: nodeData.content,
+          node_type: nodeData.node_type, position_x: newPosition.x,
+          position_y: newPosition.y, color: nodeData.color,
         })
-        .select()
-        .single();
+        .select().single();
 
       if (!error && data) {
         const newNodeData = data as MindMapNodeData;
         nodeDataMap.set(data.id, newNodeData);
+        createdIds.push(data.id);
 
         const newNode: Node = {
-          id: data.id,
-          type: 'mindmap',
-          position: newPosition,
-          data: {
-            label: data.title,
-            nodeData: newNodeData,
-            onEdit: handleEditNode,
-            onDelete: handleConfirmDelete,
-            onDuplicate: handleDuplicateNode,
-            isSelected: false,
-          },
+          id: data.id, type: 'mindmap', position: newPosition,
+          data: { label: data.title, nodeData: newNodeData, onEdit: handleEditNode, onDelete: handleConfirmDelete, onDuplicate: handleDuplicateNode, isSelected: false },
         };
         setNodes((nds) => [...nds, newNode]);
         successCount++;
       }
     }
 
+    if (createdIds.length > 0) {
+      pushAction({ type: 'batch_create_nodes', nodeIds: createdIds });
+    }
     setNodeDataMap(new Map(nodeDataMap));
     toast({ title: 'Nós duplicados!', description: `${successCount} nó(s) duplicado(s).` });
   };
@@ -426,24 +604,41 @@ function MindMapContent() {
 
     const nodeIdsArray = Array.from(selectedNodeIds);
 
+    // Save undo data before deleting
+    const undoItems = nodeIdsArray.map((nodeId) => {
+      const nd = nodeDataMap.get(nodeId);
+      const nodeEl = nodes.find((n) => n.id === nodeId);
+      const nodeEdges = edges
+        .filter((e) => e.source === nodeId || e.target === nodeId)
+        .map((e) => ({
+          id: e.id, source: e.source, target: e.target,
+          label: (e.data as any)?.label || null,
+          connectionType: (e.data as any)?.connectionType || null,
+          campaign_id: nd?.campaign_id || activeCampaign.id,
+          user_id: nd?.user_id || '',
+        }));
+      return {
+        nodeData: nd!,
+        position: nodeEl?.position || { x: nd?.position_x || 0, y: nd?.position_y || 0 },
+        edges: nodeEdges,
+      };
+    }).filter((item) => item.nodeData);
+
     // Delete all connections first
     for (const nodeId of nodeIdsArray) {
-      await supabase
-        .from('mind_map_connections')
-        .delete()
+      await supabase.from('mind_map_connections').delete()
         .or(`source_node_id.eq.${nodeId},target_node_id.eq.${nodeId}`);
     }
 
     // Delete all nodes
-    const { error } = await supabase
-      .from('mind_map_nodes')
-      .delete()
-      .in('id', nodeIdsArray);
+    const { error } = await supabase.from('mind_map_nodes').delete().in('id', nodeIdsArray);
 
     if (error) {
       toast({ variant: 'destructive', title: 'Erro ao excluir', description: error.message });
       return;
     }
+
+    pushAction({ type: 'batch_delete_nodes', items: undoItems });
 
     setNodes((nds) => nds.filter((n) => !selectedNodeIds.has(n.id)));
     setEdges((eds) => eds.filter((e) => !selectedNodeIds.has(e.source) && !selectedNodeIds.has(e.target)));
@@ -461,51 +656,35 @@ function MindMapContent() {
 
     let successCount = 0;
     let offsetX = 100;
+    const createdIds: string[] = [];
 
     for (const nodeId of copiedNodeIds) {
       const nodeData = nodeDataMap.get(nodeId);
       if (!nodeData) continue;
 
-      // Get current visual position from nodes state
       const currentNode = nodes.find(n => n.id === nodeId);
       const currentPosition = currentNode?.position || { x: nodeData.position_x || 0, y: nodeData.position_y || 0 };
 
-      const newPosition = {
-        x: currentPosition.x + offsetX,
-        y: currentPosition.y + 50,
-      };
+      const newPosition = { x: currentPosition.x + offsetX, y: currentPosition.y + 50 };
 
       const { data, error } = await supabase
         .from('mind_map_nodes')
         .insert({
-          campaign_id: activeCampaign.id,
-          user_id: user.id,
-          title: `${nodeData.title} (cópia)`,
-          content: nodeData.content,
-          node_type: nodeData.node_type,
-          position_x: newPosition.x,
-          position_y: newPosition.y,
-          color: nodeData.color,
+          campaign_id: activeCampaign.id, user_id: user.id,
+          title: `${nodeData.title} (cópia)`, content: nodeData.content,
+          node_type: nodeData.node_type, position_x: newPosition.x,
+          position_y: newPosition.y, color: nodeData.color,
         })
-        .select()
-        .single();
+        .select().single();
 
       if (!error && data) {
         const newNodeData = data as MindMapNodeData;
         nodeDataMap.set(data.id, newNodeData);
+        createdIds.push(data.id);
 
         const newNode: Node = {
-          id: data.id,
-          type: 'mindmap',
-          position: newPosition,
-          data: {
-            label: data.title,
-            nodeData: newNodeData,
-            onEdit: handleEditNode,
-            onDelete: handleConfirmDelete,
-            onDuplicate: handleDuplicateNode,
-            isSelected: false,
-          },
+          id: data.id, type: 'mindmap', position: newPosition,
+          data: { label: data.title, nodeData: newNodeData, onEdit: handleEditNode, onDelete: handleConfirmDelete, onDuplicate: handleDuplicateNode, isSelected: false },
         };
         setNodes((nds) => [...nds, newNode]);
         successCount++;
@@ -513,6 +692,9 @@ function MindMapContent() {
       }
     }
 
+    if (createdIds.length > 0) {
+      pushAction({ type: 'batch_create_nodes', nodeIds: createdIds });
+    }
     setNodeDataMap(new Map(nodeDataMap));
     toast({ title: 'Colado!', description: `${successCount} nó(s) colado(s).` });
   };
@@ -522,6 +704,8 @@ function MindMapContent() {
     if (!nodeTitle.trim() || !activeCampaign || !user) return;
 
     if (editingNodeId) {
+      // Save old data for undo
+      const oldNodeData = nodeDataMap.get(editingNodeId);
       // Update existing node
       const { error } = await supabase
         .from('mind_map_nodes')
@@ -562,6 +746,14 @@ function MindMapContent() {
             : n
         )
       );
+
+      if (oldNodeData) {
+        pushAction({
+          type: 'update_node',
+          nodeId: editingNodeId,
+          oldData: { title: oldNodeData.title, content: oldNodeData.content, node_type: oldNodeData.node_type, color: oldNodeData.color },
+        });
+      }
 
       toast({ title: 'Nó atualizado!', description: `${nodeTitle} foi salvo.` });
     } else {
@@ -607,6 +799,7 @@ function MindMapContent() {
       };
 
       setNodes((nds) => [...nds, newNode]);
+      pushAction({ type: 'create_node', nodeId: data.id });
       toast({ title: 'Nó criado!', description: `${nodeTitle} foi adicionado ao mapa.` });
     }
 
@@ -651,8 +844,9 @@ function MindMapContent() {
       };
 
       setEdges((eds) => addEdge(newEdge, eds));
+      pushAction({ type: 'create_edge', edgeId: data.id });
     },
-    [activeCampaign, user]
+    [activeCampaign, user, pushAction]
   );
 
   // Edit connection (double click)
@@ -783,14 +977,32 @@ function MindMapContent() {
   };
 
   // Auto-save position on drag stop
+  const dragStartPos = useRef<{ x: number; y: number } | null>(null);
+
+  const handleNodeDragStart = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      dragStartPos.current = { ...node.position };
+    },
+    []
+  );
+
   const handleNodeDragStop = useCallback(
     async (_event: React.MouseEvent, node: Node) => {
+      if (dragStartPos.current) {
+        pushAction({
+          type: 'move_node',
+          nodeId: node.id,
+          oldPosition: dragStartPos.current,
+          newPosition: { ...node.position },
+        });
+        dragStartPos.current = null;
+      }
       await supabase
         .from('mind_map_nodes')
         .update({ position_x: node.position.x, position_y: node.position.y })
         .eq('id', node.id);
     },
-    []
+    [pushAction]
   );
 
   // Zoom controls
@@ -866,6 +1078,7 @@ function MindMapContent() {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onNodeClick={handleNodeClick}
+            onNodeDragStart={handleNodeDragStart}
             onNodeDragStop={handleNodeDragStop}
             onPaneClick={handlePaneClick}
             onEdgeDoubleClick={handleEdgeDoubleClick}
