@@ -5,12 +5,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Plus, Save, Import, ZoomIn, ZoomOut, Maximize2, Keyboard, Download } from 'lucide-react';
+import { Plus, Save, Import, ZoomIn, ZoomOut, Maximize2, Keyboard, Download, FileJson } from 'lucide-react';
 
 interface MindMapToolbarProps {
   onAddNode: () => void;
   onSaveLayout: () => void;
   onImportEntities: () => void;
+  onImportJson: () => void;
   onExport: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
@@ -23,6 +24,7 @@ export function MindMapToolbar({
   onAddNode,
   onSaveLayout,
   onImportEntities,
+  onImportJson,
   onExport,
   onZoomIn,
   onZoomOut,
@@ -85,7 +87,12 @@ export function MindMapToolbar({
         {/* Action buttons */}
         <Button variant="outline" onClick={onImportEntities}>
           <Import className="w-4 h-4 mr-2" />
-          Importar
+          Entidades
+        </Button>
+
+        <Button variant="outline" onClick={onImportJson}>
+          <FileJson className="w-4 h-4 mr-2" />
+          JSON
         </Button>
 
         <Button variant="outline" onClick={onExport} disabled={!hasNodes}>

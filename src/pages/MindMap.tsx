@@ -42,12 +42,14 @@ import {
   EntityImportDialog,
   MindMapToolbar,
   ExportDialog,
+  ImportJsonDialog,
   NODE_TYPES,
   CONNECTION_TYPES,
   MindMapNodeData,
   NodeType,
   ConnectionType,
 } from '@/components/mindmap';
+import type { ImportJsonData } from '@/components/mindmap';
 
 const nodeTypes = { mindmap: MindMapNode };
 const edgeTypes = { mindmap: MindMapEdge };
@@ -69,6 +71,7 @@ function MindMapContent() {
   const [isEntityDialogOpen, setIsEntityDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [isImportJsonDialogOpen, setIsImportJsonDialogOpen] = useState(false);
 
   // Form states
   const [nodeTitle, setNodeTitle] = useState('');
@@ -954,6 +957,100 @@ function MindMapContent() {
     toast({ title: 'Entidades importadas!', description: `${data.length} nós foram adicionados.` });
   };
 
+  // Import from JSON
+  const handleImportJson = async (data: ImportJsonData) => {
+    if (!activeCampaign || !user) return;
+
+    // Create all nodes first, mapping ref -> real UUID
+    const refToId = new Map<string, string>();
+    const nodesToInsert = data.nodes.map((n) => {
+      const typeColor = NODE_TYPES[n.nodeType as NodeType]?.color || '#3b82f6';
+      return {
+        campaign_id: activeCampaign.id,
+        user_id: user.id,
+        title: n.title,
+        content: n.content || null,
+        node_type: n.nodeType,
+        color: n.color || typeColor,
+        position_x: n.position?.x ?? Math.random() * 600 + 100,
+        position_y: n.position?.y ?? Math.random() * 400 + 100,
+      };
+    });
+
+    const { data: createdNodes, error: nodesError } = await supabase
+      .from('mind_map_nodes')
+      .insert(nodesToInsert)
+      .select();
+
+    if (nodesError || !createdNodes) {
+      throw new Error(nodesError?.message || 'Erro ao criar nós');
+    }
+
+    // Map refs to real IDs (insertion order matches)
+    data.nodes.forEach((n, i) => {
+      refToId.set(n.ref, createdNodes[i].id);
+    });
+
+    // Add nodes to state
+    const newNodes = createdNodes.map((node) => {
+      const nd = node as MindMapNodeData;
+      nodeDataMap.set(node.id, nd);
+      return {
+        id: node.id,
+        type: 'mindmap' as const,
+        position: { x: node.position_x || 0, y: node.position_y || 0 },
+        data: {
+          label: node.title,
+          nodeData: nd,
+          onEdit: handleEditNode,
+          onDelete: handleConfirmDelete,
+          onDuplicate: handleDuplicateNode,
+          isSelected: false,
+        },
+      };
+    });
+
+    // Create connections
+    if (data.connections.length > 0) {
+      const connsToInsert = data.connections.map((c) => ({
+        campaign_id: activeCampaign.id,
+        user_id: user.id,
+        source_node_id: refToId.get(c.source)!,
+        target_node_id: refToId.get(c.target)!,
+        label: c.label || null,
+        connection_type: c.connectionType || 'default',
+      }));
+
+      const { data: createdConns, error: connsError } = await supabase
+        .from('mind_map_connections')
+        .insert(connsToInsert)
+        .select();
+
+      if (connsError) {
+        // Nodes were created but connections failed
+        toast({ variant: 'destructive', title: 'Aviso', description: 'Nós criados, mas houve erro nas conexões: ' + connsError.message });
+      }
+
+      if (createdConns) {
+        const newEdges = createdConns.map((conn) => ({
+          id: conn.id,
+          source: conn.source_node_id,
+          target: conn.target_node_id,
+          type: 'mindmap' as const,
+          data: { label: conn.label, connectionType: conn.connection_type || 'default' },
+        }));
+        setEdges((eds) => [...eds, ...newEdges]);
+      }
+    }
+
+    setNodeDataMap(new Map(nodeDataMap));
+    setNodes((nds) => [...nds, ...newNodes]);
+    pushAction({ type: 'batch_create_nodes', nodeIds: createdNodes.map((n) => n.id) });
+
+    // Fit view after import
+    setTimeout(() => reactFlowInstance.fitView({ padding: 0.2 }), 100);
+  };
+
   // Save positions
   const handleSavePositions = async () => {
     if (!activeCampaign) return;
@@ -1042,6 +1139,7 @@ function MindMapContent() {
           }}
           onSaveLayout={handleSavePositions}
           onImportEntities={() => setIsEntityDialogOpen(true)}
+          onImportJson={() => setIsImportJsonDialogOpen(true)}
           onExport={() => setIsExportDialogOpen(true)}
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
@@ -1139,6 +1237,13 @@ function MindMapContent() {
         onOpenChange={setIsEntityDialogOpen}
         campaignId={activeCampaign.id}
         onImport={handleImportEntities}
+      />
+
+      {/* JSON Import Dialog */}
+      <ImportJsonDialog
+        open={isImportJsonDialogOpen}
+        onOpenChange={setIsImportJsonDialogOpen}
+        onImport={handleImportJson}
       />
 
       {/* Delete Confirmation */}

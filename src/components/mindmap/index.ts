@@ -5,4 +5,6 @@ export { ConnectionDialog } from './ConnectionDialog';
 export { EntityImportDialog } from './EntityImportDialog';
 export { MindMapToolbar } from './MindMapToolbar';
 export { ExportDialog } from './ExportDialog';
+export { ImportJsonDialog } from './ImportJsonDialog';
+export type { ImportJsonData } from './ImportJsonDialog';
 export * from './types';
