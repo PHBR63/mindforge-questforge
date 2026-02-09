@@ -961,10 +961,22 @@ function MindMapContent() {
   const handleImportJson = async (data: ImportJsonData) => {
     if (!activeCampaign || !user) return;
 
+    // Calculate grid layout for nodes without positions
+    const GRID_COLS = Math.ceil(Math.sqrt(data.nodes.length));
+    const CELL_W = 250;
+    const CELL_H = 180;
+    const OFFSET_X = 100;
+    const OFFSET_Y = 100;
+
     // Create all nodes first, mapping ref -> real UUID
     const refToId = new Map<string, string>();
+    let autoIndex = 0;
     const nodesToInsert = data.nodes.map((n) => {
       const typeColor = NODE_TYPES[n.nodeType as NodeType]?.color || '#3b82f6';
+      const hasPosition = n.position !== undefined && n.position !== null;
+      const col = autoIndex % GRID_COLS;
+      const row = Math.floor(autoIndex / GRID_COLS);
+      autoIndex++;
       return {
         campaign_id: activeCampaign.id,
         user_id: user.id,
@@ -972,8 +984,8 @@ function MindMapContent() {
         content: n.content || null,
         node_type: n.nodeType,
         color: n.color || typeColor,
-        position_x: n.position?.x ?? Math.random() * 600 + 100,
-        position_y: n.position?.y ?? Math.random() * 400 + 100,
+        position_x: hasPosition ? n.position!.x : OFFSET_X + col * CELL_W,
+        position_y: hasPosition ? n.position!.y : OFFSET_Y + row * CELL_H,
       };
     });
 
