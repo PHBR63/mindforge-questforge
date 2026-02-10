@@ -39,6 +39,7 @@ import {
   MindMapEdge,
   NodeDialog,
   ConnectionDialog,
+  ConnectionsPanel,
   EntityImportDialog,
   MindMapToolbar,
   ExportDialog,
@@ -72,7 +73,7 @@ function MindMapContent() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [isImportJsonDialogOpen, setIsImportJsonDialogOpen] = useState(false);
-
+  const [isConnectionsPanelOpen, setIsConnectionsPanelOpen] = useState(false);
   // Form states
   const [nodeTitle, setNodeTitle] = useState('');
   const [nodeContent, setNodeContent] = useState('');
@@ -166,6 +167,8 @@ function MindMapContent() {
     );
   }, [nodeDataMap]);
 
+
+
   // Undo handler
   const handleUndo = useCallback(async () => {
     const action = popAction();
@@ -242,6 +245,28 @@ function MindMapContent() {
       case 'create_edge': {
         await supabase.from('mind_map_connections').delete().eq('id', action.edgeId);
         setEdges((eds) => eds.filter((e) => e.id !== action.edgeId));
+        break;
+      }
+      case 'delete_edge': {
+        // Undo delete = re-create the edge
+        const { data: restoredEdge } = await supabase.from('mind_map_connections').insert({
+          id: action.edgeData.id,
+          campaign_id: action.edgeData.campaign_id,
+          user_id: action.edgeData.user_id,
+          source_node_id: action.edgeData.source,
+          target_node_id: action.edgeData.target,
+          label: action.edgeData.label,
+          connection_type: action.edgeData.connection_type,
+        }).select().single();
+        if (restoredEdge) {
+          setEdges((eds) => [...eds, {
+            id: restoredEdge.id,
+            source: restoredEdge.source_node_id,
+            target: restoredEdge.target_node_id,
+            type: 'mindmap',
+            data: { label: restoredEdge.label, connectionType: restoredEdge.connection_type || 'default' },
+          }]);
+        }
         break;
       }
       case 'update_node': {
@@ -852,13 +877,70 @@ function MindMapContent() {
     [activeCampaign, user, pushAction]
   );
 
-  // Edit connection (double click)
-  const handleEdgeDoubleClick = useCallback((_: React.MouseEvent, edge: Edge) => {
+  // Edit connection (single click on edge or via button)
+  const handleEdgeClick = useCallback((_: React.MouseEvent, edge: Edge) => {
     setEditingConnection(edge);
     setConnectionLabel((edge.data as any)?.label || '');
     setConnectionType((edge.data as any)?.connectionType || 'default');
     setIsConnectionDialogOpen(true);
   }, []);
+
+  // Edit connection by id (from panel or hover button)
+  const handleEditConnectionById = useCallback((edgeId: string) => {
+    const edge = edges.find((e) => e.id === edgeId);
+    if (!edge) return;
+    setEditingConnection(edge);
+    setConnectionLabel((edge.data as any)?.label || '');
+    setConnectionType((edge.data as any)?.connectionType || 'default');
+    setIsConnectionDialogOpen(true);
+  }, [edges]);
+
+  // Delete connection
+  const handleDeleteConnection = useCallback(async (edgeId: string) => {
+    const edge = edges.find((e) => e.id === edgeId);
+    if (!edge || !activeCampaign || !user) return;
+
+    // Save for undo
+    pushAction({
+      type: 'delete_edge',
+      edgeData: {
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        label: (edge.data as any)?.label || null,
+        connection_type: (edge.data as any)?.connectionType || null,
+        campaign_id: activeCampaign.id,
+        user_id: user.id,
+      },
+    });
+
+    const { error } = await supabase
+      .from('mind_map_connections')
+      .delete()
+      .eq('id', edgeId);
+
+    if (error) {
+      toast({ variant: 'destructive', title: 'Erro ao excluir conexão', description: error.message });
+      return;
+    }
+
+    setEdges((eds) => eds.filter((e) => e.id !== edgeId));
+    toast({ title: 'Conexão excluída!' });
+  }, [edges, activeCampaign, user, pushAction, toast]);
+
+  // Update edge callbacks when handlers change
+  useEffect(() => {
+    setEdges((eds) =>
+      eds.map((e) => ({
+        ...e,
+        data: {
+          ...e.data,
+          onEdit: handleEditConnectionById,
+          onDelete: handleDeleteConnection,
+        },
+      }))
+    );
+  }, [handleEditConnectionById, handleDeleteConnection]);
 
   // Update connection style
   const handleSubmitConnection = async () => {
@@ -880,7 +962,7 @@ function MindMapContent() {
     setEdges((eds) =>
       eds.map((e) =>
         e.id === editingConnection.id
-          ? { ...e, data: { label: connectionLabel, connectionType } }
+          ? { ...e, data: { ...e.data, label: connectionLabel, connectionType } }
           : e
       )
     );
@@ -1156,12 +1238,15 @@ function MindMapContent() {
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
           onFitView={handleFitView}
+          onToggleConnections={() => setIsConnectionsPanelOpen((p) => !p)}
           isSaving={isSaving}
           hasNodes={nodes.length > 0}
+          hasEdges={edges.length > 0}
+          isConnectionsPanelOpen={isConnectionsPanelOpen}
         />
       }
     >
-      <div ref={containerRef} className="h-[calc(100vh-12rem)] rounded-lg border border-border/50 overflow-hidden bg-card">
+      <div ref={containerRef} className="relative h-[calc(100vh-12rem)] rounded-lg border border-border/50 overflow-hidden bg-card">
         {nodes.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
@@ -1191,7 +1276,7 @@ function MindMapContent() {
             onNodeDragStart={handleNodeDragStart}
             onNodeDragStop={handleNodeDragStop}
             onPaneClick={handlePaneClick}
-            onEdgeDoubleClick={handleEdgeDoubleClick}
+            onEdgeClick={handleEdgeClick}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             defaultEdgeOptions={{ type: 'mindmap' }}
@@ -1213,6 +1298,16 @@ function MindMapContent() {
             <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
           </ReactFlow>
         )}
+
+        {/* Connections Panel */}
+        <ConnectionsPanel
+          open={isConnectionsPanelOpen}
+          onClose={() => setIsConnectionsPanelOpen(false)}
+          edges={edges}
+          nodeDataMap={nodeDataMap}
+          onEdit={handleEditConnectionById}
+          onDelete={handleDeleteConnection}
+        />
       </div>
 
       {/* Node Dialog */}

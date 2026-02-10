@@ -5,7 +5,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Plus, Save, Import, ZoomIn, ZoomOut, Maximize2, Keyboard, Download, FileJson } from 'lucide-react';
+import { Plus, Save, Import, ZoomIn, ZoomOut, Maximize2, Keyboard, Download, FileJson, Link2 } from 'lucide-react';
 
 interface MindMapToolbarProps {
   onAddNode: () => void;
@@ -16,8 +16,11 @@ interface MindMapToolbarProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onFitView: () => void;
+  onToggleConnections: () => void;
   isSaving: boolean;
   hasNodes: boolean;
+  hasEdges: boolean;
+  isConnectionsPanelOpen: boolean;
 }
 
 export function MindMapToolbar({
@@ -29,8 +32,11 @@ export function MindMapToolbar({
   onZoomIn,
   onZoomOut,
   onFitView,
+  onToggleConnections,
   isSaving,
   hasNodes,
+  hasEdges,
+  isConnectionsPanelOpen,
 }: MindMapToolbarProps) {
   return (
     <TooltipProvider>
@@ -99,6 +105,20 @@ export function MindMapToolbar({
           <Download className="w-4 h-4 mr-2" />
           Exportar
         </Button>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant={isConnectionsPanelOpen ? 'default' : 'outline'}
+              onClick={onToggleConnections}
+              disabled={!hasEdges && !isConnectionsPanelOpen}
+            >
+              <Link2 className="w-4 h-4 mr-2" />
+              Conexões
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Painel de Conexões</TooltipContent>
+        </Tooltip>
 
         <Button variant="outline" onClick={onSaveLayout} disabled={isSaving || !hasNodes}>
           <Save className="w-4 h-4 mr-2" />
