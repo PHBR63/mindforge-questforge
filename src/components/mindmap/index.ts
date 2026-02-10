@@ -2,6 +2,7 @@ export { MindMapNode } from './MindMapNode';
 export { MindMapEdge } from './MindMapEdge';
 export { NodeDialog } from './NodeDialog';
 export { ConnectionDialog } from './ConnectionDialog';
+export { ConnectionsPanel } from './ConnectionsPanel';
 export { EntityImportDialog } from './EntityImportDialog';
 export { MindMapToolbar } from './MindMapToolbar';
 export { ExportDialog } from './ExportDialog';
