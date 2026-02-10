@@ -45,6 +45,41 @@ const importSchema = z.object({
 
 export type ImportJsonData = z.infer<typeof importSchema>;
 
+/**
+ * Detects if the JSON is in the export format (has `exportedAt`, `id` instead of `ref`)
+ * and converts it to the import format automatically.
+ */
+function convertExportFormat(data: any): any {
+  if (!data || typeof data !== 'object') return data;
+
+  // Detect export format: has exportedAt or nodes with `id` but no `ref`
+  const isExportFormat =
+    data.exportedAt ||
+    data.metadata ||
+    (Array.isArray(data.nodes) && data.nodes.length > 0 && data.nodes[0].id && !data.nodes[0].ref);
+
+  if (!isExportFormat) return data;
+
+  // Build id->ref mapping (use id as ref)
+  const nodes = (data.nodes || []).map((n: any) => ({
+    ref: n.id || n.ref,
+    title: n.title,
+    content: n.content ?? null,
+    nodeType: n.nodeType || n.node_type || 'idea',
+    color: n.color ?? null,
+    position: n.position ?? null,
+  }));
+
+  const connections = (data.connections || []).map((c: any) => ({
+    source: c.source,
+    target: c.target,
+    label: c.label ?? null,
+    connectionType: c.connectionType || c.connection_type || 'default',
+  }));
+
+  return { version: data.version || '1.0', nodes, connections };
+}
+
 interface ImportJsonDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -103,7 +138,10 @@ export function ImportJsonDialog({ open, onOpenChange, onImport }: ImportJsonDia
       return;
     }
 
-    const result = importSchema.safeParse(parsed);
+    // Auto-detect exported format and convert
+    const converted = convertExportFormat(parsed);
+
+    const result = importSchema.safeParse(converted);
     if (!result.success) {
       const msgs = result.error.issues.map(
         (i) => `${i.path.join('.')}: ${i.message}`
