@@ -1171,14 +1171,14 @@ function MindMapContent() {
   const dragStartPos = useRef<{ x: number; y: number } | null>(null);
 
   const handleNodeDragStart = useCallback(
-    (_event: React.MouseEvent, node: Node) => {
+    (_event: unknown, node: Node) => {
       dragStartPos.current = { ...node.position };
     },
     []
   );
 
   const handleNodeDragStop = useCallback(
-    async (_event: React.MouseEvent, node: Node) => {
+    async (_event: unknown, node: Node) => {
       if (dragStartPos.current) {
         pushAction({
           type: 'move_node',
